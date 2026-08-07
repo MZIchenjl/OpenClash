@@ -114,6 +114,10 @@ function index()
 	entry({"admin", "services", "openclash", "oix_login_info_save"}, call("oix_login_info_save"))
 	entry({"admin", "services", "openclash", "oix_params_sync"}, call("oix_params_sync"))
 	entry({"admin", "services", "openclash", "oix_params_get"}, call("oix_params_get"))
+	entry({"admin", "services", "openclash", "efan_login"}, call("efan_login"))
+	entry({"admin", "services", "openclash", "efan_refresh"}, call("efan_refresh"))
+	entry({"admin", "services", "openclash", "efan_status"}, call("efan_status"))
+	entry({"admin", "services", "openclash", "efan_logout"}, call("efan_logout"))
 end
 
 local SYS = require "luci.sys"
@@ -5899,6 +5903,121 @@ function action_add_age_config()
 	end
 
 	HTTP.write_json({status = "success"})
+end
+
+local EFAN_CLIENT = "/usr/share/openclash/openclash_efan.rb"
+local EFAN_REQUEST_DIR = "/tmp/openclash-efan-requests"
+
+local function efan_json_error(code, message)
+	return {status = "error", error = code, message = message}
+end
+
+local function run_efan_client(command, argument)
+	if not nixio.fs.access(EFAN_CLIENT) then
+		return efan_json_error("client_missing", "Efan client is not installed")
+	end
+	local fdi, fdo = nixio.pipe()
+	if not fdi or not fdo then
+		if fdi then fdi:close() end
+		if fdo then fdo:close() end
+		return efan_json_error("spawn_failed", "cannot create Efan client pipe")
+	end
+
+	local pid = nixio.fork()
+	if pid == 0 then
+		fdi:close()
+		nixio.dup(fdo, nixio.stdout)
+		local null = nixio.open("/dev/null", "w")
+		if null then nixio.dup(null, nixio.stderr) end
+		fdo:close()
+		if argument then
+			nixio.exec("/usr/bin/ruby", EFAN_CLIENT, command, argument)
+		else
+			nixio.exec("/usr/bin/ruby", EFAN_CLIENT, command)
+		end
+		os.exit(127)
+	elseif not pid or pid < 0 then
+		fdi:close()
+		fdo:close()
+		return efan_json_error("spawn_failed", "cannot start Efan client")
+	end
+
+	fdo:close()
+	local chunks = {}
+	local size = 0
+	while true do
+		local chunk = fdi:read(4096)
+		if not chunk or #chunk == 0 then break end
+		size = size + #chunk
+		if size > 1024 * 1024 then
+			nixio.kill(pid, 9)
+			fdi:close()
+			nixio.waitpid(pid)
+			return efan_json_error("response_too_large", "Efan client response is too large")
+		end
+		chunks[#chunks + 1] = chunk
+	end
+	fdi:close()
+	nixio.waitpid(pid)
+
+	local raw = table.concat(chunks):gsub("^%s+", ""):gsub("%s+$", "")
+	local ok, result = pcall(json.parse, raw)
+	if not ok or type(result) ~= "table" then
+		return efan_json_error("invalid_client_response", "Efan client returned invalid JSON")
+	end
+	return result
+end
+
+local function efan_write_login_request(email, password)
+	nixio.fs.mkdir(EFAN_REQUEST_DIR)
+	nixio.fs.chmod(EFAN_REQUEST_DIR, 448) -- 0700
+	local name = string.format("login-%d-%d.json", nixio.getpid(), math.random(100000, 999999))
+	local path = EFAN_REQUEST_DIR .. "/" .. name
+	if not fs.writefile(path, json.stringify({email = email, password = password})) then
+		return nil
+	end
+	nixio.fs.chmod(path, 384) -- 0600
+	return path
+end
+
+function efan_login()
+	local email = (HTTP.formvalue("email") or ""):gsub("^%s+", ""):gsub("%s+$", "")
+	local password = HTTP.formvalue("password") or ""
+	local result
+	if email == "" or #email > 254 or not email:match("^[^%s@]+@[^%s@]+$") then
+		result = efan_json_error("invalid_email", "email format is invalid")
+	elseif password == "" or #password > 4096 then
+		result = efan_json_error("invalid_password", "password is required")
+	else
+		local request_path = efan_write_login_request(email, password)
+		password = nil
+		if not request_path then
+			result = efan_json_error("storage_error", "cannot create a secure login request")
+		else
+			result = run_efan_client("login", request_path)
+			nixio.fs.unlink(request_path)
+		end
+	end
+	HTTP.prepare_content("application/json")
+	HTTP.write_json(result)
+end
+
+function efan_refresh()
+	local email = HTTP.formvalue("email") or ""
+	HTTP.prepare_content("application/json")
+	HTTP.write_json(run_efan_client("refresh", email))
+end
+
+function efan_status()
+	local email = HTTP.formvalue("email") or ""
+	HTTP.prepare_content("application/json")
+	HTTP.write_json(run_efan_client("status", email))
+end
+
+function efan_logout()
+	local email = HTTP.formvalue("email") or ""
+	HTTP.prepare_content("application/json")
+	HTTP.write_json(run_efan_client("logout", email))
 end
 
 function oix_login_info_save()

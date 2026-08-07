@@ -79,6 +79,7 @@ s:tab("auto_restart", translate("Auto Restart"))
 s:tab("debug", translate("Core Tests"))
 s:tab("developer", translate("Developer Settings"))
 s:tab("version_update", translate("Version Update"))
+s:tab("efan", translate("Efan Account"))
 s:tab("oixcloud", translate("oixCloud"))
 
 o = s:taboption("op_mode", ListValue, "en_mode", font_red..bold_on..translate("Select Mode")..bold_off..font_off)
@@ -1427,6 +1428,11 @@ o.template = "openclash/debug"
 oixcloud_panel = s:taboption("oixcloud", DummyValue, "", nil)
 oixcloud_panel.template = "openclash/oix_login"
 oixcloud_panel.rawhtml = true
+
+---- Efan
+efan_panel = s:taboption("efan", DummyValue, "", nil)
+efan_panel.template = "openclash/efan_login"
+efan_panel.rawhtml = true
 
 local t = {
 	{Commit, Apply}
