@@ -58,6 +58,11 @@ build/
 /tmp/
 *.tmp
 
+# Efan runtime caches and real downloaded configurations
+efan-*.json
+efan-*.yaml
+efan-*.yml
+
 # Patch files (unless intentional)
 *.orig
 *.rej

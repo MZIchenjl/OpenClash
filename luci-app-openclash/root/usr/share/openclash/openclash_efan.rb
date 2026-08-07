@@ -19,6 +19,10 @@ module OpenClashEfan
   CONFIG_DIR = File.join(ROOT, "config")
   CURL_BIN = ENV.fetch("OPENCLASH_EFAN_CURL", "curl")
   MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+  # OpenClash's nftables and iptables output chains reserve GID 65534 for
+  # traffic that must not be transparently redirected back into Mihomo. Use
+  # that same documented-by-implementation bypass for API control traffic.
+  OPENCLASH_BYPASS_GID = 65_534
   PRIVATE_KEY_MASK = "encoding".b
   PRIVATE_KEY_BLOB = Base64.decode64(<<~B64).freeze
     SENOQkkrKyAsIEM9NyhONzcnNS4wLE4sIDdOQklEQ20oJyoqFDgnJSQvKCwlOCsmHDgpFjIzOSRK
@@ -68,6 +72,19 @@ module OpenClashEfan
 
   def now
     Time.now.to_i
+  end
+
+  def api_host
+    uri = URI.parse(API_BASE)
+    raise Error.new("invalid_api_host", "Efan API host is invalid") unless uri.host
+
+    uri.host
+  rescue URI::InvalidURIError
+    raise Error.new("invalid_api_host", "Efan API host is invalid")
+  end
+
+  def mihomo_bin
+    ENV.fetch("OPENCLASH_EFAN_MIHOMO", "/etc/openclash/core/clash_meta")
   end
 
   def sanitize_user(email)
@@ -123,6 +140,38 @@ module OpenClashEfan
     raise Error.new("storage_error", "cannot update #{File.basename(path)}: #{e.message}")
   ensure
     File.delete(temp) if defined?(temp) && File.exist?(temp)
+  end
+
+  # A converted file is never allowed to replace the last-known-good file
+  # until the exact Mihomo core used by OpenClash accepts it. Tests may opt out
+  # explicitly because the upstream Mihomo binary cannot parse type=x365.
+  def validate_mihomo_config(content)
+    return true if ENV["OPENCLASH_EFAN_SKIP_MIHOMO_VALIDATE"] == "1"
+    binary = mihomo_bin
+    unless File.file?(binary) && File.executable?(binary)
+      raise Error.new("mihomo_missing", "the x365-capable Mihomo core is not installed")
+    end
+
+    ensure_directories
+    temp = File.join(CONFIG_DIR, ".efan-validate-#{$$}-#{rand(1_000_000)}.yaml")
+    File.open(temp, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+      file.write(content)
+      file.flush
+      file.fsync
+    end
+    null = File.open(File::NULL, "w")
+    pid = Process.spawn(binary, "-t", "-f", temp, out: null, err: null)
+    _, process_status = Process.wait2(pid)
+    raise Error.new("mihomo_validation_failed", "the generated Mihomo configuration is invalid") unless process_status.success?
+
+    true
+  rescue Error
+    raise
+  rescue SystemCallError => e
+    raise Error.new("mihomo_validation_failed", "cannot validate the generated Mihomo configuration: #{e.class}")
+  ensure
+    null.close if defined?(null) && null && !null.closed?
+    File.delete(temp) if defined?(temp) && temp && File.file?(temp)
   end
 
   def read_json(path)
@@ -182,14 +231,21 @@ module OpenClashEfan
 
     read_pipe, write_pipe = IO.pipe
     error_io = File.open(error_file, File::WRONLY | File::CREAT | File::EXCL, 0o600)
-    pid = Process.spawn(CURL_BIN, "--config", config_file, out: write_pipe, err: error_io)
+    pid = Process.spawn(
+      CURL_BIN,
+      "--config",
+      config_file,
+      out: write_pipe,
+      err: error_io,
+      gid: OPENCLASH_BYPASS_GID
+    )
     write_pipe.close
     status_text = read_pipe.read
     read_pipe.close
     _, process_status = Process.wait2(pid)
     error_io.close
-    curl_error = File.exist?(error_file) ? File.binread(error_file, 2048).strip : ""
-    response = File.exist?(response_file) ? File.binread(response_file, MAX_RESPONSE_BYTES + 1) : ""
+    curl_error = File.exist?(error_file) ? File.binread(error_file, 2048).to_s.strip : ""
+    response = File.exist?(response_file) ? File.binread(response_file, MAX_RESPONSE_BYTES + 1).to_s : ""
     raise Error.new("response_too_large", "Efan API response is too large") if response.bytesize > MAX_RESPONSE_BYTES
 
     status = status_text.to_s[/\d{3}\z/].to_i
@@ -399,7 +455,7 @@ module OpenClashEfan
         {"name" => group_name, "type" => "select", "proxies" => [auto_group_name] + names},
         {"name" => auto_group_name, "type" => "url-test", "url" => "https://www.gstatic.com/generate_204", "interval" => 300, "proxies" => names}
       ],
-      "rules" => domain_rules(source["direct_domain"], "DIRECT") +
+      "rules" => ["DOMAIN,#{api_host},DIRECT"] + domain_rules(source["direct_domain"], "DIRECT") +
         domain_rules(source["proxy_domain"], group_name) + ["MATCH,#{group_name}"]
     }
 
@@ -477,7 +533,7 @@ module OpenClashEfan
       "proxy-groups" => [
         {"name" => "Efan Services", "type" => "select", "proxies" => service_choices}
       ] + service_groups,
-      "rules" => ["MATCH,Efan Services"]
+      "rules" => ["DOMAIN,#{api_host},DIRECT", "MATCH,Efan Services"]
     }
     nameservers = nameservers.compact.map(&:to_s).reject(&:empty?).uniq
     default_nameservers = default_nameservers.compact.map(&:to_s).reject(&:empty?).uniq
@@ -493,6 +549,7 @@ module OpenClashEfan
     return nil unless yaml
 
     path = all_config_path(email)
+    validate_mihomo_config(yaml)
     atomic_write(path, yaml, 0o600)
     path
   end
@@ -500,22 +557,37 @@ module OpenClashEfan
   def fetch_service(email, service, udp: true)
     result = http_request("GET", "/v1/app?flag=wassvpn", token: service.fetch("access_token"))
     if [401, 403].include?(result.status)
-      return {"id" => service["id"], "name" => service["service_name"], "status" => "auth_invalid", "http_status" => result.status}
+      return {
+        "id" => service["id"],
+        "name" => service["service_name"],
+        "account_status" => service["status"],
+        "status" => "auth_invalid",
+        "http_status" => result.status
+      }
     end
     app_data = parse_json_response(result)
     yaml = convert_config(app_data, service, udp: udp)
     target = config_path(email, service["id"])
+    validate_mihomo_config(yaml)
     atomic_write(target, yaml, 0o600)
     {
       "id" => service["id"],
       "name" => service["service_name"],
+      "account_status" => service["status"],
       "status" => "updated",
       "config" => target,
       "nodes" => safe_yaml_load(yaml)["proxies"].length,
       "updated_at" => now
     }
   rescue Error => e
-    {"id" => service["id"], "name" => service["service_name"], "status" => "error", "error" => e.code, "message" => e.message}
+    {
+      "id" => service["id"],
+      "name" => service["service_name"],
+      "account_status" => service["status"],
+      "status" => "error",
+      "error" => e.code,
+      "message" => e.message
+    }
   end
 
   def refresh_cache(cache, udp: true)
@@ -533,6 +605,7 @@ module OpenClashEfan
         item = by_id[service["id"].to_s]
         service["last_fetch_status"] = item["status"]
         service["last_fetched_at"] = item["updated_at"] if item["updated_at"]
+        service["last_node_count"] = item["nodes"] if item["nodes"]
       end
       cache["updated_at"] = now
       atomic_write(account_path(email), JSON.pretty_generate(cache) + "\n", 0o600)
@@ -558,44 +631,129 @@ module OpenClashEfan
     cache = {"schema" => 1, "email" => email, "services" => services, "updated_at" => now}
     atomic_write(account_path(email), JSON.pretty_generate(cache) + "\n", 0o600)
     results = refresh_cache(cache, udp: udp)
-    {"status" => "ok", "email" => email, "account_cache" => account_path(email), "all_config" => all_config_path(email), "services" => results}
+    operation_result(email, results)
   ensure
     File.delete(input_path) if input_path && File.file?(input_path)
   end
 
   def refresh(email, udp: true)
     cache = read_json(account_path(email))
-    {"status" => "ok", "email" => cache["email"], "all_config" => all_config_path(cache["email"]), "services" => refresh_cache(cache, udp: udp)}
+    results = refresh_cache(cache, udp: udp)
+    operation_result(cache["email"], results)
   end
 
   def logout(email)
     path = account_path(email)
     existed = File.exist?(path)
     File.delete(path) if existed
-    {"status" => "ok", "email" => email.to_s.strip.downcase, "account_cache_deleted" => existed, "configs_preserved" => true}
+    {
+      "status" => "ok",
+      "session_state" => "logged_out",
+      "email" => email.to_s.strip.downcase,
+      "account_cache_deleted" => existed,
+      "configs_preserved" => true
+    }
   end
 
   def status(email)
+    return discovered_status if email.to_s.strip.empty?
+
     cache = read_json(account_path(email))
     services = cache.fetch("services", []).map do |service|
       {
         "id" => service["id"],
         "name" => service["service_name"],
-        "status" => service["status"],
+        "account_status" => service["status"],
+        "status" => service["last_fetch_status"] || (File.file?(config_path(cache["email"], service["id"])) ? "cached" : "not_fetched"),
         "last_fetch_status" => service["last_fetch_status"],
         "last_fetched_at" => service["last_fetched_at"],
+        "nodes" => service["last_node_count"],
         "config" => config_path(cache["email"], service["id"]),
         "config_exists" => File.file?(config_path(cache["email"], service["id"]))
       }
     end
     {
       "status" => "ok",
+      "session_state" => "logged_in",
       "email" => cache["email"],
       "updated_at" => cache["updated_at"],
+      "remembered_on_router" => true,
       "all_config" => all_config_path(cache["email"]),
       "all_config_exists" => File.file?(all_config_path(cache["email"])),
       "services" => services
+    }.merge(fetch_summary(services))
+  end
+
+  def fetch_summary(results)
+    total = results.length
+    ready = results.count do |item|
+      %w[updated cached ready].include?(item["status"].to_s) ||
+        %w[updated cached ready].include?(item["last_fetch_status"].to_s) ||
+        (item["config_exists"] && item["last_fetch_status"].to_s.empty?)
+    end
+    auth_invalid = results.count do |item|
+      item["status"] == "auth_invalid" || item["last_fetch_status"] == "auth_invalid"
+    end
+    failed = total - ready - auth_invalid
+    fetch_state = if auth_invalid.positive?
+                    "auth_invalid"
+                  elsif total.zero?
+                    "empty"
+                  elsif ready == total
+                    "ready"
+                  elsif ready.positive?
+                    "partial"
+                  else
+                    "failed"
+                  end
+    {
+      "fetch_state" => fetch_state,
+      "service_count" => total,
+      "ready_count" => ready,
+      "failed_count" => failed,
+      "auth_invalid_count" => auth_invalid
     }
+  end
+
+  def operation_result(email, results)
+    logged_in = File.file?(account_path(email))
+    output = {
+      "status" => logged_in ? "ok" : "error",
+      "session_state" => logged_in ? "logged_in" : "expired",
+      "email" => email,
+      "remembered_on_router" => logged_in,
+      "all_config" => all_config_path(email),
+      "all_config_exists" => File.file?(all_config_path(email)),
+      "services" => results
+    }.merge(fetch_summary(results))
+    unless logged_in
+      output["error"] = "service_auth_invalid"
+      output["message"] = "one or more service tokens are invalid; please log in again"
+    end
+    output
+  end
+
+  def discovered_status
+    accounts = Dir.glob(File.join(ROOT, "efan-*.json")).each_with_object([]) do |path, list|
+      begin
+        cache = JSON.parse(File.binread(path))
+        email = cache["email"].to_s
+        next if email.empty? || !cache["services"].is_a?(Array)
+
+        list << {
+          "email" => email,
+          "updated_at" => cache["updated_at"],
+          "service_count" => cache["services"].length,
+          "all_config_exists" => File.file?(all_config_path(email))
+        }
+      rescue JSON::ParserError, SystemCallError, Error
+        next
+      end
+    end.sort_by { |account| -account["updated_at"].to_i }
+
+    return {"status" => "ok", "session_state" => "logged_out", "accounts" => []} if accounts.empty?
+
+    status(accounts.first["email"]).merge("accounts" => accounts)
   end
 
   def run(argv)

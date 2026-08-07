@@ -1,24 +1,41 @@
+<style type="text/css">
+	#efan-panel .efan-state { font-weight: 600; margin-right: .75rem; }
+	#efan-panel .efan-summary { opacity: .8; }
+	#efan-panel .efan-status-ready { color: #2d8a4f; }
+	#efan-panel .efan-status-busy { color: #3a8fb7; }
+	#efan-panel .efan-status-warning { color: #c78300; }
+	#efan-panel .efan-status-error { color: #d34a4a; }
+	#efan-panel .efan-actions .btn { margin: .2rem .35rem .2rem 0; }
+</style>
+
 <div class="cbi-section" id="efan-panel">
 	<h3><%:Efan Account%></h3>
-	<p class="cbi-section-descr"><%:Login fetches every service in the account, creates one independent Mihomo YAML configuration per service, and creates an all-services configuration with normal selectable proxy groups. Passwords are never cached.%></p>
+	<p class="cbi-section-descr"><%:Login fetches every service in the account, creates one independent Mihomo YAML configuration per service, and creates an all-services configuration with normal selectable proxy groups. The account and service tokens are remembered on this router; passwords are never cached.%></p>
 
+	<div class="cbi-value">
+		<label class="cbi-value-title"><%:Account State%></label>
+		<div class="cbi-value-field">
+			<span id="efan-account-state" class="efan-state efan-status-busy"><%:Checking router cache...%></span>
+			<span id="efan-account-summary" class="efan-summary"></span>
+		</div>
+	</div>
 	<div class="cbi-value">
 		<label class="cbi-value-title" for="efan-email"><%:Account Email Address%></label>
 		<div class="cbi-value-field">
 			<input id="efan-email" type="email" autocomplete="email" class="cbi-input-text" size="36">
 		</div>
 	</div>
-	<div class="cbi-value">
+	<div class="cbi-value" id="efan-password-row">
 		<label class="cbi-value-title" for="efan-password"><%:Account Password%></label>
 		<div class="cbi-value-field">
 			<input id="efan-password" type="password" autocomplete="current-password" class="cbi-input-text" size="36">
 		</div>
 	</div>
 	<div class="cbi-value">
-		<div class="cbi-value-field">
+		<div class="cbi-value-field efan-actions">
 			<button type="button" class="btn cbi-button cbi-button-apply" id="efan-login-button" onclick="EfanAccount.login()"><%:Login and fetch all services%></button>
-			<button type="button" class="btn cbi-button cbi-button-reload" id="efan-refresh-button" onclick="EfanAccount.refresh()"><%:Refresh all services%></button>
-			<button type="button" class="btn cbi-button cbi-button-remove" id="efan-logout-button" onclick="EfanAccount.logout()"><%:Logout Account%></button>
+			<button type="button" class="btn cbi-button cbi-button-reload" id="efan-refresh-button" style="display:none" disabled onclick="EfanAccount.refresh()"><%:Refresh all services%></button>
+			<button type="button" class="btn cbi-button cbi-button-remove" id="efan-logout-button" style="display:none" disabled onclick="EfanAccount.logout()"><%:Logout Account%></button>
 		</div>
 	</div>
 
@@ -28,7 +45,9 @@
 			<tr>
 				<th><%:Service ID%></th>
 				<th><%:Service Name%></th>
-				<th><%:Status%></th>
+				<th><%:Account Status%></th>
+				<th><%:Fetch Status%></th>
+				<th><%:Nodes%></th>
 				<th><%:Configuration File%></th>
 			</tr>
 		</thead>
@@ -46,43 +65,117 @@ var EFAN_URLS = {
 
 var EfanAccount = {
 	storageKey: 'openclash.efan.email',
+	state: 'checking',
 
 	init: function() {
-		var email = window.localStorage ? localStorage.getItem(this.storageKey) : '';
-		if (email) {
-			document.getElementById('efan-email').value = email;
-			this.status(true);
-		}
+		var email = '';
+		try { email = window.localStorage ? (localStorage.getItem(this.storageKey) || '') : ''; }
+		catch (e) { email = ''; }
+		if (email) document.getElementById('efan-email').value = email;
+		this.setState('checking');
+		this.status(true);
 	},
 
 	email: function() {
 		return document.getElementById('efan-email').value.trim();
 	},
 
-	setBusy: function(busy) {
-		['efan-login-button', 'efan-refresh-button', 'efan-logout-button'].forEach(function(id) {
-			document.getElementById(id).disabled = busy;
-		});
+	remember: function(email) {
+		try { if (window.localStorage) localStorage.setItem(this.storageKey, email); }
+		catch (e) {}
 	},
 
-	message: function(text, error) {
+	forget: function() {
+		try { if (window.localStorage) localStorage.removeItem(this.storageKey); }
+		catch (e) {}
+	},
+
+	setState: function(state, result) {
+		this.state = state;
+		var loggedIn = state === 'logged_in' || state === 'refreshing' || state === 'logging_out';
+		var busy = state === 'checking' || state === 'logging_in' || state === 'refreshing' || state === 'logging_out';
+		var labels = {
+			checking: '<%:Checking router cache...%>',
+			logged_out: '<%:Not logged in%>',
+			logging_in: '<%:Logging in...%>',
+			logged_in: '<%:Logged in%>',
+			refreshing: '<%:Refreshing services...%>',
+			logging_out: '<%:Logging out...%>',
+			expired: '<%:Login expired%>',
+			error: '<%:Status unavailable%>'
+		};
+		var classes = {
+			checking: 'efan-status-busy', logging_in: 'efan-status-busy', refreshing: 'efan-status-busy', logging_out: 'efan-status-busy',
+			logged_in: 'efan-status-ready', logged_out: '', expired: 'efan-status-warning', error: 'efan-status-error'
+		};
+		var stateElement = document.getElementById('efan-account-state');
+		stateElement.textContent = labels[state] || state;
+		stateElement.className = 'efan-state ' + (classes[state] || '');
+
+		var loginButton = document.getElementById('efan-login-button');
+		var refreshButton = document.getElementById('efan-refresh-button');
+		var logoutButton = document.getElementById('efan-logout-button');
+		var emailInput = document.getElementById('efan-email');
+		var passwordRow = document.getElementById('efan-password-row');
+		loginButton.style.display = loggedIn ? 'none' : '';
+		refreshButton.style.display = loggedIn ? '' : 'none';
+		logoutButton.style.display = loggedIn ? '' : 'none';
+		loginButton.disabled = busy;
+		refreshButton.disabled = busy || !loggedIn;
+		logoutButton.disabled = busy || !loggedIn;
+		emailInput.readOnly = loggedIn || busy;
+		passwordRow.style.display = loggedIn ? 'none' : '';
+		document.getElementById('efan-password').disabled = busy || loggedIn;
+		this.updateSummary(result);
+	},
+
+	updateSummary: function(result) {
+		var summary = document.getElementById('efan-account-summary');
+		if (!result || result.service_count == null) {
+			summary.textContent = '';
+			return;
+		}
+		var parts = [String(result.service_count) + ' <%:services%>'];
+		if (result.ready_count != null) parts.push(String(result.ready_count) + ' <%:ready%>');
+		if (result.failed_count) parts.push(String(result.failed_count) + ' <%:failed%>');
+		if (result.all_config_exists) parts.push('<%:all-services configuration ready%>');
+		summary.textContent = parts.join(' · ');
+	},
+
+	message: function(text, level) {
 		var element = document.getElementById('efan-message');
 		element.textContent = text || '';
-		element.className = error ? 'alert-message error' : 'alert-message notice';
+		element.className = level === 'error' ? 'alert-message error' : 'alert-message notice';
 		element.style.display = text ? '' : 'none';
 	},
 
 	post: function(url, data, callback) {
 		var request = new XMLHttpRequest();
+		var completed = false;
+		var finish = function(result, status) {
+			if (completed) return;
+			completed = true;
+			callback(result, status);
+		};
 		request.open('POST', url, true);
 		request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
 		request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 		request.onreadystatechange = function() {
 			if (request.readyState !== 4) return;
 			var result;
-			try { result = JSON.parse(request.responseText); }
-			catch (e) { result = {status: 'error', message: '<%:Invalid server response%>'}; }
-			callback(result, request.status);
+			try {
+				result = JSON.parse(request.responseText);
+			} catch (e) {
+				var contentType = request.getResponseHeader('Content-Type') || 'unknown content type';
+				var message = (request.status === 401 || request.status === 403)
+					? '<%:LuCI session expired; reload this page and sign in again.%>'
+					: '<%:LuCI endpoint returned a non-JSON response%>' + ' (HTTP ' + String(request.status || 0) + ', ' + contentType + ')';
+				result = {status: 'error', error: 'invalid_http_response', message: message, http_status: request.status};
+			}
+			finish(result, request.status);
+		};
+		request.onerror = function() {
+			finish({status: 'error', error: 'luci_network_error', message: '<%:Cannot reach the LuCI Efan endpoint%>'}, 0);
 		};
 		var body = Object.keys(data).map(function(key) {
 			return encodeURIComponent(key) + '=' + encodeURIComponent(data[key]);
@@ -90,20 +183,37 @@ var EfanAccount = {
 		request.send(body);
 	},
 
+	serviceStatus: function(service) {
+		var status = service.status || service.last_fetch_status || '';
+		var labels = {
+			updated: '<%:Updated%>', cached: '<%:Cached%>', ready: '<%:Ready%>', not_fetched: '<%:Not fetched%>',
+			error: '<%:Failed%>', auth_invalid: '<%:Token expired%>'
+		};
+		var text = labels[status] || status;
+		if (service.error) text += ' (' + service.error + ')';
+		return text;
+	},
+
 	render: function(result) {
 		var table = document.getElementById('efan-services');
 		var body = table.querySelector('tbody');
 		while (body.firstChild) body.removeChild(body.firstChild);
-		var services = result && Array.isArray(result.services) ? result.services : [];
+		var services = result && Array.isArray(result.services) ? result.services.slice(0) : [];
 		if (result && result.all_config) {
-			services = [{id: 'all', name: '<%:All services (selectable groups)%>', status: result.all_config_exists === false ? '' : 'ready', config: result.all_config}].concat(services);
+			services.unshift({
+				id: 'all', name: '<%:All services (selectable groups)%>', account_status: '',
+				status: result.all_config_exists ? 'ready' : 'not_fetched', config: result.all_config, nodes: ''
+			});
 		}
+		var self = this;
 		services.forEach(function(service) {
 			var row = document.createElement('tr');
 			var values = [
 				service.id == null ? '' : String(service.id),
 				service.name || '',
-				service.status || service.last_fetch_status || '',
+				service.account_status || '',
+				self.serviceStatus(service),
+				service.nodes == null ? '' : String(service.nodes),
 				service.config || ''
 			];
 			values.forEach(function(value) {
@@ -116,65 +226,100 @@ var EfanAccount = {
 		table.style.display = services.length ? '' : 'none';
 	},
 
+	authenticatedResult: function(result, operation) {
+		if (result.session_state === 'expired' || result.error === 'service_auth_invalid') {
+			this.forget();
+			this.render(result);
+			this.setState('expired', result);
+			this.message('<%:Service token expired. The account cache was removed; cached YAML files were preserved. Log in again.%>', 'error');
+			return;
+		}
+		if (result.status !== 'ok' || result.session_state !== 'logged_in') {
+			this.setState('error', result);
+			this.message(result.message || result.error || '<%:Efan operation failed%>', 'error');
+			return;
+		}
+		if (result.email) {
+			document.getElementById('efan-email').value = result.email;
+			this.remember(result.email);
+		}
+		this.render(result);
+		this.setState('logged_in', result);
+		if (result.fetch_state === 'ready') {
+			this.message(operation === 'login' ? '<%:Logged in. Every service configuration is ready.%>' : '<%:Every service configuration was refreshed.%>', 'notice');
+		} else if (result.fetch_state === 'partial') {
+			this.message('<%:Some services failed to refresh; successful services and last-known-good configurations were preserved.%>', 'notice');
+		} else if (result.fetch_state === 'failed') {
+			this.message('<%:No service could be refreshed. The login is still cached and last-known-good configurations were preserved.%>', 'error');
+		} else {
+			this.message('', 'notice');
+		}
+	},
+
 	login: function() {
 		var email = this.email();
 		var passwordInput = document.getElementById('efan-password');
 		var password = passwordInput.value;
-		if (!/^[^\s@]+@[^\s@]+$/.test(email)) { this.message('<%:Please enter a valid email address%>', true); return; }
-		if (!password) { this.message('<%:Please enter password%>', true); return; }
+		if (!/^[^\s@]+@[^\s@]+$/.test(email)) { this.message('<%:Please enter a valid email address%>', 'error'); return; }
+		if (!password) { this.message('<%:Please enter password%>', 'error'); return; }
 		passwordInput.value = '';
-		this.setBusy(true);
-		this.message('<%:Logging in and fetching all services...%>', false);
+		this.setState('logging_in');
+		this.message('<%:Logging in and fetching every service...%>', 'notice');
 		var self = this;
 		this.post(EFAN_URLS.login, {email: email, password: password}, function(result) {
 			password = '';
-			self.setBusy(false);
-			if (result.status === 'ok') {
-				if (window.localStorage) localStorage.setItem(self.storageKey, email);
-				self.render(result);
-				self.message('<%:Login completed. Every service was attempted independently.%>', false);
-			} else {
-				self.message(result.message || result.error || '<%:Login failed%>', true);
-			}
+			self.authenticatedResult(result, 'login');
 		});
 	},
 
 	refresh: function() {
+		if (this.state !== 'logged_in') return;
 		var email = this.email();
-		if (!email) { this.message('<%:Please enter email address%>', true); return; }
-		this.setBusy(true);
-		this.message('<%:Refreshing all services...%>', false);
+		this.setState('refreshing');
+		this.message('<%:Refreshing every service...%>', 'notice');
 		var self = this;
 		this.post(EFAN_URLS.refresh, {email: email}, function(result) {
-			self.setBusy(false);
-			self.render(result);
-			self.message(result.status === 'ok' ? '<%:All services have been attempted.%>' : (result.message || result.error), result.status !== 'ok');
+			self.authenticatedResult(result, 'refresh');
 		});
 	},
 
 	status: function(silent) {
-		var email = this.email();
-		if (!email) return;
 		var self = this;
-		this.post(EFAN_URLS.status, {email: email}, function(result) {
-			if (result.status === 'ok') self.render(result);
-			else if (!silent) self.message(result.message || result.error, true);
+		this.post(EFAN_URLS.status, {email: this.email()}, function(result) {
+			if (result.status === 'ok' && result.session_state === 'logged_in') {
+				if (result.email) document.getElementById('efan-email').value = result.email;
+				self.remember(result.email);
+				self.render(result);
+				self.setState('logged_in', result);
+				return;
+			}
+			if ((result.status === 'ok' && result.session_state === 'logged_out') || result.error === 'not_logged_in') {
+				self.forget();
+				self.render({services: []});
+				self.setState('logged_out');
+				if (!silent) self.message('<%:No Efan account is logged in on this router.%>', 'notice');
+				return;
+			}
+			self.setState('error', result);
+			self.message(result.message || result.error || '<%:Cannot read Efan account status%>', 'error');
 		});
 	},
 
 	logout: function() {
+		if (this.state !== 'logged_in') return;
 		var email = this.email();
-		if (!email) { this.message('<%:Please enter email address%>', true); return; }
-		this.setBusy(true);
+		this.setState('logging_out');
 		var self = this;
 		this.post(EFAN_URLS.logout, {email: email}, function(result) {
-			self.setBusy(false);
 			if (result.status === 'ok') {
-				if (window.localStorage) localStorage.removeItem(self.storageKey);
+				self.forget();
+				document.getElementById('efan-email').value = '';
 				self.render({services: []});
-				self.message('<%:Account token cache was deleted. Generated YAML configurations were preserved.%>', false);
+				self.setState('logged_out');
+				self.message('<%:Logged out. The account and token cache was deleted; generated YAML configurations were preserved.%>', 'notice');
 			} else {
-				self.message(result.message || result.error, true);
+				self.setState('logged_in');
+				self.message(result.message || result.error || '<%:Logout failed%>', 'error');
 			}
 		});
 	}

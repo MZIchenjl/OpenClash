@@ -10,6 +10,7 @@ require "zlib"
 
 TEST_ROOT = Dir.mktmpdir("openclash-efan-test-")
 ENV["OPENCLASH_EFAN_ROOT"] = TEST_ROOT
+ENV["OPENCLASH_EFAN_SKIP_MIHOMO_VALIDATE"] = "1"
 load File.expand_path("../luci-app-openclash/root/usr/share/openclash/openclash_efan.rb", __dir__)
 
 class OpenClashEfanTest < Minitest::Test
@@ -59,6 +60,7 @@ class OpenClashEfanTest < Minitest::Test
     assert_equal TEST_PBK, proxy.dig("reality-opts", "public-key")
     assert_equal true, proxy["udp"]
     assert_equal ["https://1.1.1.1/dns-query"], output.dig("dns", "nameserver")
+    assert_equal "DOMAIN,app.eod621808.com,DIRECT", output.fetch("rules").first
   end
 
   def test_login_fetches_every_service_and_writes_independent_configs
@@ -93,6 +95,9 @@ class OpenClashEfanTest < Minitest::Test
 
     assert_equal ["service-token-a", "service-token-b"], calls.drop(1).map(&:last)
     assert_equal [101, 202], result.fetch("services").map { |item| item["id"] }
+    assert_equal "logged_in", result["session_state"]
+    assert_equal "ready", result["fetch_state"]
+    assert_equal 2, result["ready_count"]
     assert File.file?(OpenClashEfan.config_path("user@example.com", 101))
     assert File.file?(OpenClashEfan.config_path("user@example.com", 202))
     assert File.file?(OpenClashEfan.all_config_path("user@example.com"))
@@ -103,6 +108,7 @@ class OpenClashEfanTest < Minitest::Test
     assert_equal ["Efan - First (101)", "Efan - Second (202)"],
                  combined.fetch("proxy-groups").first.fetch("proxies")
     assert_equal ["First / Visible", "Second / Visible"], combined.fetch("proxies").map { |proxy| proxy["name"] }
+    assert_equal "DOMAIN,app.eod621808.com,DIRECT", combined.fetch("rules").first
     assert_equal "MATCH,Efan Services", combined.fetch("rules").last
 
     cache_text = File.binread(OpenClashEfan.account_path("user@example.com"))
@@ -147,8 +153,41 @@ class OpenClashEfanTest < Minitest::Test
     result = OpenClashEfan.logout("user@example.com")
     assert_equal true, result["account_cache_deleted"]
     assert_equal true, result["configs_preserved"]
+    assert_equal "logged_out", result["session_state"]
     refute File.exist?(OpenClashEfan.account_path("user@example.com"))
     assert File.exist?(config)
+  end
+
+  def test_empty_status_discovers_router_cached_account
+    write_cache
+    result = OpenClashEfan.status("")
+
+    assert_equal "logged_in", result["session_state"]
+    assert_equal "user@example.com", result["email"]
+    assert_equal 1, result.fetch("accounts").length
+    assert_equal true, result["remembered_on_router"]
+  end
+
+  def test_empty_status_reports_logged_out_without_cache
+    result = OpenClashEfan.status("")
+
+    assert_equal "ok", result["status"]
+    assert_equal "logged_out", result["session_state"]
+    assert_empty result["accounts"]
+  end
+
+  def test_mihomo_validation_is_required_before_replacement
+    ENV.delete("OPENCLASH_EFAN_SKIP_MIHOMO_VALIDATE")
+    ENV["OPENCLASH_EFAN_MIHOMO"] = "/usr/bin/false"
+
+    error = assert_raises(OpenClashEfan::Error) do
+      OpenClashEfan.validate_mihomo_config("proxies: []\n")
+    end
+    assert_equal "mihomo_validation_failed", error.code
+    assert_empty Dir.glob(File.join(TEST_ROOT, "config", ".efan-validate-*"))
+  ensure
+    ENV["OPENCLASH_EFAN_SKIP_MIHOMO_VALIDATE"] = "1"
+    ENV.delete("OPENCLASH_EFAN_MIHOMO")
   end
 
   private

@@ -5970,13 +5970,13 @@ end
 
 local function efan_write_login_request(email, password)
 	nixio.fs.mkdir(EFAN_REQUEST_DIR)
-	nixio.fs.chmod(EFAN_REQUEST_DIR, 448) -- 0700
+	nixio.fs.chmod(EFAN_REQUEST_DIR, "0700")
 	local name = string.format("login-%d-%d.json", nixio.getpid(), math.random(100000, 999999))
 	local path = EFAN_REQUEST_DIR .. "/" .. name
 	if not fs.writefile(path, json.stringify({email = email, password = password})) then
 		return nil
 	end
-	nixio.fs.chmod(path, 384) -- 0600
+	nixio.fs.chmod(path, "0600")
 	return path
 end
 
