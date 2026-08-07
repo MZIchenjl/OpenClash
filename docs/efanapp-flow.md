@@ -24,6 +24,7 @@ data.my_services[]
     │ servers: show 过滤、sort_order/id 排序
     ▼
 x365 节点 → Mihomo YAML
+    │ 使用当前 /etc/openclash/core/clash_meta -t 校验
     ├─ efan-${user}-${service-id}.yaml
     └─ efan-${user}-all.yaml
 ```
@@ -90,6 +91,8 @@ Accept: application/json
 - 一个名称包含多个 URI 时，用 `#2` 等后缀保证节点名唯一。
 - URI 只接受已确认参数 `path`、`host`、`sni`、`pbk`、`sid`；缺失、重复或出现未知参数均拒绝。
 - 输出节点 `type: x365`，协议细节见 `docs/x365-protocol.md`。
+- 临时 YAML 必须先通过当前 x365 版 Mihomo 的 `-t` 校验，才允许原子替换最后有效配置。
+- Efan API 控制请求的 curl 子进程使用 OpenClash 防火墙预留的 GID 65534 旁路，避免“路由器自身代理”把登录/刷新请求递归送回当前代理。
 
 ## 最终配置长什么样
 
@@ -123,10 +126,47 @@ proxy-groups:
     proxies: [香港01]
 
 rules:
+  - DOMAIN,app.eod621808.com,DIRECT
   - MATCH,Efan - 主服务
 ```
 
 汇总文件 `efan-${user}-all.yaml` 的首层组是 `Efan Services`。它引用每个服务的选择组；每个服务组又包含自动测速入口和该服务全部可见节点。因此同一个活动配置中可以先选服务，再手选节点。
+
+OpenClash 加载汇总文件后会生成实际运行文件，并补充自己的入口和管理字段。典型结构如下；代理认证值和控制器 secret 由 OpenClash 自身管理，不属于 Efan 缓存：
+
+```yaml
+port: 7890
+socks-port: 7891
+redir-port: 7892
+mixed-port: 7893
+tproxy-port: 7895
+external-controller: 0.0.0.0:9090
+dns:
+  listen: 0.0.0.0:7874
+
+proxies:                 # 每个节点仍是 type: x365
+proxy-groups:
+  - name: Efan Services  # 先选 service
+    type: select
+  - name: Efan - <service-id>
+    type: select         # 再选 Auto 或具体节点
+  - name: Efan - <service-id> Auto
+    type: url-test
+rules:
+  - DOMAIN,app.eod621808.com,DIRECT
+  - MATCH,Efan Services
+```
+
+## LuCI 页面状态
+
+- 未登录：账号和密码可输入；只启用“登录并拉取全部服务”。
+- 登录中/刷新中/退出中：相关字段和按钮锁定，显示进行中的明确状态。
+- 已登录：账号从路由器缓存恢复并锁定；隐藏密码和登录按钮，只显示“刷新全部服务”和“退出”。
+- 部分失败：逐 service 显示失败码，成功文件和最后有效文件继续保留。
+- token 失效：显示“登录已失效”，删除账号缓存，恢复登录表单，已生成 YAML 继续显示为缓存文件。
+- LuCI session、HTTP 非 JSON、网络错误和服务端错误分别显示，不再统一显示 `Invalid server response`。
+
+页面初始化会调用后端发现 `/etc/openclash/efan-*.json`，因此重启路由器或更换浏览器后仍能恢复登录状态；浏览器 localStorage 只作为账号输入便利，不是登录状态的权威来源。
 
 ## 缓存和失效规则
 

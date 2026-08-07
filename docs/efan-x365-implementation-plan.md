@@ -58,7 +58,7 @@
   "services": [
     {
       "id": "service-id",
-      "name": "service-name",
+      "service_name": "service-name",
       "status": 1,
       "access_token": "<sensitive>"
     }
@@ -138,3 +138,5 @@ proxies:
 5. 对每个 service 至少验证 TCP/HTTP、TLS/HTTPS、DNS/UDP，并验证多 service 部分失败不会覆盖其他 service 的有效配置。
 6. 验证容器重启后的 token/config 缓存行为；验证登出及 401/403 会删除账号缓存但保留 YAML，5xx、超时和断网不会误删 token。
 7. 将无凭据、无 token 的测试命令、结果摘要和可复现步骤写入验收文档；敏感值只允许存在于容器内 `0600` 临时文件，并在测试结束后清除。
+
+验收记录见 `docs/efan-x365-e2e.md`。
