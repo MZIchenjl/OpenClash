@@ -1,0 +1,381 @@
+openapi: 3.1.0
+info:
+  title: efanapp API
+  version: 1.0.40
+  description: |
+    OpenAPI document reconstructed from efanapp 1.0.40 (macOS arm64)
+    and verified against live responses on 2026-08-06.
+
+    Authentication uses two token levels:
+    1. `POST /v1/login` returns an account token and service records.
+    2. `GET /v1/app?flag=wassvpn` uses the selected service's
+       `access_token` as the raw `Authorization` header value.
+
+    The value is not automatically prefixed with `Bearer `.
+    The official client also emits `x-did`, `x-sig`, `User-Agent`,
+    `Accept-Language`, and `Content-Language`; live verification showed
+    that `x-did` and `x-sig` were not required for the operations below.
+
+    Evidence labels used below:
+    - `static`: recovered from efanapp 1.0.40 code or constants.
+    - `live`: observed in a successful request/response using the supplied account.
+    No request field, method, path, host, or token placement in this document is inferred.
+
+servers:
+  - url: https://app.eod621808.com
+    description: API host observed in the application's TLS SNI and verified by live requests
+
+tags:
+  - name: Public configuration
+  - name: Authentication
+  - name: Service configuration
+
+paths:
+  /v1/app/config:
+    get:
+      tags:
+        - Public configuration
+      operationId: getPublicAppConfig
+      summary: Get public application configuration
+      security: []
+      responses:
+        "200":
+          description: Public application configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicAppConfigResponse"
+              example:
+                code: 0
+                message: 成功
+                data:
+                  customer_service_url: https://efanccyun.org
+                  announcement_text: ""
+                  announcement_url: ""
+
+  /v1/login:
+    post:
+      tags:
+        - Authentication
+      operationId: login
+      summary: Log in with email and password
+      description: |
+        The client trims the email before sending it. The password is sent
+        as entered. A successful response contains an account-level `token`
+        and one or more service-level `access_token` values.
+      x-evidence:
+        - static
+        - live
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              email: user@example.com
+              password: "<password>"
+      responses:
+        "200":
+          description: Login succeeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Email or password is incorrect
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: 1
+                message: 邮箱或密码错误
+
+  /v1/app:
+    get:
+      tags:
+        - Service configuration
+      operationId: getWassVpnAppData
+      summary: Get account data and server configuration list
+      description: |
+        Requires the selected service's `access_token`. Supply the token
+        verbatim in `Authorization`; do not add a Bearer prefix unless that
+        prefix is already part of the returned token. Call this endpoint once
+        for every item in `data.my_services[]`; each service has its own token
+        and configuration response.
+      x-evidence:
+        - static
+        - live
+      security:
+        - serviceAccessToken: []
+      parameters:
+        - name: flag
+          in: query
+          required: true
+          description: Product/configuration selector hard-coded by the client
+          schema:
+            type: string
+            const: wassvpn
+          example: wassvpn
+      responses:
+        "200":
+          description: User data, proxy data, and server configuration list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppDataResponse"
+
+components:
+  securitySchemes:
+    serviceAccessToken:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Raw `data.my_services[].access_token`; this is not a Bearer scheme.
+
+  schemas:
+    PublicAppConfigResponse:
+      type: object
+      additionalProperties: true
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: 成功
+        data:
+          $ref: "#/components/schemas/PublicAppConfig"
+
+    PublicAppConfig:
+      type: object
+      additionalProperties: true
+      required:
+        - customer_service_url
+      properties:
+        customer_service_url:
+          type: string
+          format: uri
+          example: https://efanccyun.org
+        announcement_text:
+          type: string
+        announcement_url:
+          type: string
+
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email account; the client sends its trimmed value.
+        password:
+          type: string
+          format: password
+          writeOnly: true
+
+    LoginResponse:
+      type: object
+      additionalProperties: true
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          example: 登录成功
+        data:
+          $ref: "#/components/schemas/LoginData"
+
+    LoginData:
+      type: object
+      additionalProperties: true
+      required:
+        - token
+        - user
+        - my_services
+      properties:
+        token:
+          type: string
+          description: Account-level token. This is not the token used to fetch the service configuration list.
+          x-sensitive: true
+        user:
+          type: object
+          description: Login user object. The live response was verified as an object; its internal contract is left open.
+          additionalProperties: true
+        my_services:
+          type: array
+          items:
+            $ref: "#/components/schemas/MyService"
+
+    MyService:
+      type: object
+      additionalProperties: true
+      required:
+        - id
+        - domain
+        - status
+        - service_name
+        - next_due_date
+        - access_token
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        domain:
+          type: string
+        status:
+          type: string
+          description: The client accepts an empty value or a case-insensitive value of `active`.
+          example: Active
+        service_name:
+          type: string
+        next_due_date:
+          type: string
+          format: date-time
+        access_token:
+          type: string
+          description: Service-level token sent verbatim in the `Authorization` header.
+          x-sensitive: true
+
+    AppDataResponse:
+      type: object
+      additionalProperties: true
+      required:
+        - proxy
+        - servers
+        - user
+      properties:
+        proxy:
+          type: string
+          contentEncoding: base64
+          description: |
+            Encrypted configuration string. Live response type and the exact
+            decoding pipeline were verified: strict Base64 decode; split into
+            256-byte blocks; RSA-2048 PKCS#1 v1.5 private decrypt each block;
+            concatenate; zlib inflate; parse the resulting UTF-8 YAML.
+
+            The decrypted YAML observed in the live response has the root
+            fields `port`, `proxies`, `direct_domain`, `proxy_domain`,
+            `domain_resolver`, `local_dns`, `dns`, and `fallback_mode`.
+          x-evidence:
+            - static
+            - live
+        servers:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppServer"
+        user:
+          $ref: "#/components/schemas/AppUser"
+
+    AppServer:
+      type: object
+      additionalProperties: true
+      required:
+        - id
+        - name
+        - iso_code
+        - show
+        - sort_order
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        iso_code:
+          type: string
+        tags:
+          oneOf:
+            - type: array
+              items:
+                type: string
+            - type: "null"
+        show:
+          type: integer
+          description: The client displays the server when this value is non-zero.
+          default: 1
+        sort_order:
+          type: integer
+          description: Servers are sorted by `sort_order`, then by `id`.
+
+    AppUser:
+      type: object
+      description: Field names and JSON types below were observed in the live response.
+      additionalProperties: true
+      properties:
+        created_at:
+          type: integer
+        d:
+          type: integer
+        enable:
+          type: integer
+        expired_at:
+          type: integer
+        id:
+          type: integer
+        passwd:
+          type: string
+          x-sensitive: true
+        pid:
+          type: integer
+        port:
+          type: string
+        reset_day:
+          type: string
+        server_entrance_id:
+          type: integer
+        server_group_id:
+          type: integer
+        speed_limit:
+          type: integer
+        subscribe_token:
+          type: string
+          x-sensitive: true
+        t:
+          type: integer
+        transfer_enable:
+          type: integer
+        u:
+          type: integer
+        updated_at:
+          type: integer
+        uuid:
+          type: string
+          x-sensitive: true
+        whm_hosting_id:
+          type: integer
+        whm_invoice_id:
+          type: integer
+        whm_product_id:
+          type: integer
+        whm_user_id:
+          type: integer
+        whm_invoice_id: {}
+        whm_product_id: {}
+        whm_user_id: {}
+
+    ErrorResponse:
+      type: object
+      additionalProperties: true
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
