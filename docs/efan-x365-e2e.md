@@ -1,12 +1,12 @@
 # Efan x365 / OpenClash 端到端验收
 
-验收日期：2026-08-07。所有账号、密码、service token、真实 UUID、公钥、short ID、节点 URI、服务器地址和 OpenClash 本地认证值均已从本文档及 Git 排除。
+验收日期：2026-08-11。所有账号、密码、service token、真实 UUID、公钥、short ID、节点 URI、服务器地址和 OpenClash 本地认证值均已从本文档及 Git 排除。
 
 ## 被测对象
 
 - OpenWrt：24.10.8，`armsr/armv8`，`aarch64_generic`，Docker 原生 ARM64。
 - OpenClash：0.47.152 加本仓库 Efan 多 service 实现；最终验收包 `luci-app-openclash_0.47.152-x365_all.ipk` 的 SHA-256 为 `b614bd4b200fd80099bbaf577a552e9755c50ce6ef7a14c411b884a17d4bb920`。
-- Mihomo：`cd4e8fa2`，Linux ARM64，`type: x365`；二进制 SHA-256 为 `f8b08b5480e9da61067b47149d2799d6392e890896c8d5088b1ea211886d3b4a`。
+- Mihomo：`4fb29e24`，Linux ARM64，`type: x365`；最终无调试二进制 SHA-256 为 `547797af67ef145db4de9d16a827e986476ffb0e9aa1d15536438343bd17df43`。
 - OpenClash 测试容器：完整 LuCI、dnsmasq-full、firewall4、Ruby 3.3 及 OpenClash 运行依赖；不是仅运行转换脚本的最小容器。
 
 x86_64 也完成了 OpenWrt 24.10.8、完整 OpenClash IPK 和修改后 Mihomo 的安装/启动检查；x86 核心 SHA-256 为 `90e82d31e399f46b43f5d6316b391d84a94beed5f5a3b90c1f4cd902558eef14`。ARM Mac 上的 Docker/QEMU x86 模拟环境中，OpenWrt 的 Ruby 3.3 在执行 `ruby -v` 时即发生解释器级段错误，因此真实登录功能验收改在原生 ARM64 容器完成。该限制不发生在 ARM64 容器。
@@ -25,6 +25,9 @@ x86_64 也完成了 OpenWrt 24.10.8、完整 OpenClash IPK 和修改后 Mihomo �
 | 缓存权限 | 通过 | 账号 JSON 与全部 YAML 均为 0600；敏感临时目录为 0700 |
 | 密码不缓存 | 通过 | 账号 JSON 无 password key；登录临时文件数为 0 |
 | Mihomo 原生代理 | 通过 | 抽测第 1/56/110 个节点，HTTPS 均返回 204 |
+| 真实 UDP 回包 | 通过 | DNS（两个目标）、NTP、STUN 均收到并校验有效回包；同一 association 连续 5 包通过 |
+| 多节点 UDP | 通过并记录差异 | 分散抽测 5 个节点，4 个通过；1 个在 Mihomo 和官方 core 下均不支持 UDP，但 TCP 均正常 |
+| 官方 core 对照 | 通过 | `global` 模式明确绑定节点，DNS/NTP 回包成功，排除规则直连；失败节点的 UDP/TCP 结果与 Mihomo 一致 |
 | 分组与节点选择 | 通过 | REST PUT 切换 service 内具体节点均返回 204，`now` 与选择值一致 |
 | 完整 OpenClash 启动 | 通过 | 六阶段启动完成，日志为 `OpenClash Start Successful` |
 | OpenClash 管理代理 | 通过 | 使用 OpenClash 生成的入口/认证，经 7890 访问 HTTPS 返回 204 |
@@ -51,17 +54,27 @@ OpenClash 读取 `efan-${user}-all.yaml` 后生成自己的活动配置。脱敏
 2. OpenWrt Ruby 3.3 在读取空 curl stderr 文件时可能返回 nil。读取结果显式 `to_s` 后，不再误报 network_error。
 3. 路由器自身代理会递归接管 API 控制请求。curl 子进程改用 OpenClash 防火墙明确预留的 GID 65534 旁路，并在配置首条加入 API host DIRECT 规则；OpenClash 运行中刷新已通过。
 4. OpenClash 会生成自己的本地代理认证。代理验收从 UCI 内部读取该值，不在命令输出、文档或 Git 中暴露。
+5. OpenClash 的 7890 是 HTTP 端口，SOCKS5 是 7891，mixed 是 7893。UDP 探测必须使用 7891/7893 并携带 OpenClash 本地认证；使用 7890 得到的控制连接超时不是 UDP 协议结果。
+6. Mihomo 创建 UDP PacketConn 后会取消建连 context；x365 stream 必须像 `net.Dialer` 返回的连接一样继续存活。真实服务端还可能等到首个数据报才返回 HTTP 状态，因此响应检查移动到第一次读取。
+7. 官方 `x_padding` 不是任意 padding：参数名、100–999 长度以及全 `X` 内容均从官方构造函数和运行时全局模板确认。
 
 ## UDP 状态
 
-本地 HTTP/2 集成测试已覆盖 x365 UDP 首包、两字节大端长度帧、回包、截断排空和最大长度。真实节点经 SOCKS5 UDP 向公共 DNS 发包时 12 秒内没有回包；OpenClash 日志中的 NTP UDP 也只有发出记录。因此本文档不宣称当前线上 service 开通 UDP 转发。TCP/HTTPS 代理功能已由多个真实节点动态确认。
+真实 UDP 服务端回包已经完整确认：
+
+- 官方 core 使用 `global` 模式和明确节点，两个 DNS 目标及 NTP 均回包，TCP 同时为 204。
+- 最终无调试 Mihomo 核心经 OpenClash 正式 SOCKS5 入口（含本地认证）完成 DNS、NTP、STUN；响应长度分别按协议校验。
+- 同一 UDP association 连续发送 5 个 DNS 包，5 个响应均成功，证明长度帧读取后仍保持对齐。
+- 分散抽取 5 个真实节点时 4 个支持 UDP。剩余 1 个节点在 Mihomo 下 UDP 连续失败、TCP 204；官方 core 对相同节点也是 DNS/NTP 全失败、TCP 成功。因此它被记录为节点能力差异，不作为协议回归失败。
+
+本地 HTTP/2 集成测试还覆盖服务端收到首个 UDP 数据报后才返回 HTTP 状态、Dial context 取消后 stream 继续存活、响应首包、两字节大端长度、截断排空、关闭和最大长度。
 
 ## 自动化检查
 
 ```text
 OpenClash Ruby tests: 10 tests, 55 assertions, 0 failures
 LuCI state tests:     efan_luci_ui_tests: ok
-Mihomo targeted Go:   transport/x365, adapter/outbound, adapter, constant, component/tls
+Mihomo targeted Go:   transport/x365 (-race + vet), adapter/outbound, adapter, constant, component/tls
 ```
 
 敏感值只进入 LuCI POST body 和权限 0600 的一次性请求文件；后端在成功或失败后均删除该文件。验收响应只读取状态、数量、类型、权限和 HTTP 状态，不输出 token 或真实节点字段。最终真实注销已经删除容器内账号及 service token 缓存，最后有效 YAML 按设计保留。
