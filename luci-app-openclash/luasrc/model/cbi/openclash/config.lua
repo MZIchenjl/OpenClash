@@ -193,7 +193,9 @@ btnis.render=function(o,t,a)
 end
 btnis.write=function(a,t)
 	uci:set("openclash", "config", "config_path", "/etc/openclash/config/"..e[t].name)
+	uci:set("openclash", "config", "enable", "1")
 	uci:commit("openclash")
+	SYS.call("/etc/init.d/openclash restart >/dev/null 2>&1 &")
 	HTTP.redirect(DISP.build_url("admin", "services", "openclash", "config"))
 end
 
