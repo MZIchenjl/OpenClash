@@ -177,3 +177,9 @@ rules:
 - 登出删除账号缓存，保留全部 YAML。
 - 任一服务明确返回 HTTP 401/403 时删除账号缓存，保留最后有效 YAML。
 - 网络失败、TLS 错误、超时和 5xx 不删除账号缓存，也不覆盖最后有效 YAML。
+
+### 自动更新
+
+Efan Account 页提供独立的“Auto Update Efan Subscriptions”开关和分钟周期（5–10080 分钟，默认 60 分钟）。设置保存在 OpenClash UCI 的 `efan_auto_update` 与 `efan_update_interval` 字段中。OpenClash 运行期间，watchdog 按周期调用专用更新任务；任务会刷新路由器中记住的全部 Efan 账号，并对每个账号拉取全部 service。
+
+自动任务使用独立文件锁防止重叠。若服务鉴权失效，账号 Token 缓存按既有规则删除，已经生成的 YAML 继续保留；若当前活动配置是 `efan-*.yaml` 且内容确实发生变化，则通过 OpenClash 的任务计数器安排安全重启，使新配置生效。自动任务日志仅记录账号和服务数量，不记录邮箱、Token 或密码。

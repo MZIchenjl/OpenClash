@@ -1430,6 +1430,17 @@ oixcloud_panel.template = "openclash/oix_login"
 oixcloud_panel.rawhtml = true
 
 ---- Efan
+o = s:taboption("efan", Flag, "efan_auto_update", translate("Auto Update Efan Subscriptions"))
+o.description = translate("Automatically refresh every remembered Efan account and all of its services. An invalid token removes the account cache but preserves generated YAML configurations.")
+o.default = 0
+
+o = s:taboption("efan", Value, "efan_update_interval", translate("Update Interval(min)"))
+o.description = translate("The automatic refresh runs while OpenClash is enabled. If an active Efan configuration changes, OpenClash restarts to apply it.")
+o.default = "60"
+o.datatype = "range(5,10080)"
+o:depends("efan_auto_update", "1")
+o.rmempty = true
+
 efan_panel = s:taboption("efan", DummyValue, "", nil)
 efan_panel.template = "openclash/efan_login"
 efan_panel.rawhtml = true

@@ -642,6 +642,60 @@ module OpenClashEfan
     operation_result(cache["email"], results)
   end
 
+  def account_cache_paths
+    Dir.glob(File.join(ROOT, "efan-*.json")).select { |path| File.file?(path) }.sort
+  end
+
+  # Used by the watchdog. The aggregate intentionally contains no account
+  # identifiers or service tokens because it may be written to system logs.
+  def refresh_all(udp: true)
+    paths = account_cache_paths
+    totals = {
+      "account_count" => paths.length,
+      "processed_account_count" => 0,
+      "failed_account_count" => 0,
+      "service_count" => 0,
+      "ready_count" => 0,
+      "failed_count" => 0,
+      "auth_invalid_count" => 0
+    }
+
+    paths.each do |path|
+      account_service_count = 0
+      begin
+        cache = read_json(path)
+        email = cache["email"].to_s.strip.downcase
+        expected_path = account_path(email)
+        raise Error.new("invalid_cache", "account cache filename does not match its email") unless expected_path == path
+        raise Error.new("invalid_cache", "account cache has no services") unless cache["services"].is_a?(Array)
+
+        account_service_count = cache["services"].length
+        totals["service_count"] += account_service_count
+        summary = fetch_summary(refresh_cache(cache, udp: udp))
+        totals["ready_count"] += summary["ready_count"]
+        totals["failed_count"] += summary["failed_count"]
+        totals["auth_invalid_count"] += summary["auth_invalid_count"]
+        totals["processed_account_count"] += 1
+      rescue Error, SystemCallError, JSON::ParserError
+        totals["failed_count"] += account_service_count
+        totals["failed_account_count"] += 1
+      end
+    end
+
+    remaining = account_cache_paths.length
+    output = {
+      "status" => (totals["failed_account_count"].zero? && totals["failed_count"].zero? && totals["auth_invalid_count"].zero?) ? "ok" : "error",
+      "session_state" => paths.empty? ? "logged_out" : (remaining.zero? ? "expired" : "logged_in"),
+      "remaining_account_count" => remaining
+    }.merge(totals)
+    if totals["auth_invalid_count"].positive?
+      output["error"] = "service_auth_invalid"
+    elsif totals["failed_account_count"].positive? || totals["failed_count"].positive?
+      output["error"] = "refresh_failed"
+    end
+    output
+  end
+
   def logout(email)
     path = account_path(email)
     existed = File.exist?(path)
@@ -734,7 +788,7 @@ module OpenClashEfan
   end
 
   def discovered_status
-    accounts = Dir.glob(File.join(ROOT, "efan-*.json")).each_with_object([]) do |path, list|
+    accounts = account_cache_paths.each_with_object([]) do |path, list|
       begin
         cache = JSON.parse(File.binread(path))
         email = cache["email"].to_s
@@ -767,6 +821,9 @@ module OpenClashEfan
                email = argv.shift
                raise Error.new("usage", "refresh requires an email") unless email && argv.empty?
                refresh(email)
+             when "refresh-all"
+               raise Error.new("usage", "refresh-all takes no arguments") unless argv.empty?
+               refresh_all
              when "logout"
                email = argv.shift
                raise Error.new("usage", "logout requires an email") unless email && argv.empty?
@@ -776,7 +833,7 @@ module OpenClashEfan
                raise Error.new("usage", "status requires an email") unless email && argv.empty?
                status(email)
              else
-               raise Error.new("usage", "usage: openclash_efan.rb login REQUEST.json | refresh EMAIL | status EMAIL | logout EMAIL")
+               raise Error.new("usage", "usage: openclash_efan.rb login REQUEST.json | refresh EMAIL | refresh-all | status EMAIL | logout EMAIL")
              end
     puts JSON.generate(result)
     0

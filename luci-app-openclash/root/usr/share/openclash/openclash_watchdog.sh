@@ -7,6 +7,7 @@
 LOG_FILE="/tmp/openclash.log"
 CLASH="/etc/openclash/clash"
 CFG_UPDATE_INT=0
+EFAN_UPDATE_INT=0
 SKIP_PROXY_ADDRESS=1
 SKIP_PROXY_ADDRESS_INTERVAL=30
 UPNP_INT=1
@@ -183,6 +184,12 @@ do
    cfg_update=$(uci_get_config "auto_update")
    cfg_update_mode=$(uci_get_config "config_auto_update_mode")
    cfg_update_interval=$(uci_get_config "config_update_interval" || echo 60)
+   efan_auto_update=$(uci_get_config "efan_auto_update" || echo 0)
+   efan_update_interval=$(uci_get_config "efan_update_interval" || echo 60)
+   case "$efan_update_interval" in
+      ''|*[!0-9]*) efan_update_interval=60 ;;
+      *) [ "$efan_update_interval" -lt 5 ] && efan_update_interval=60 ;;
+   esac
    stream_auto_select=$(uci_get_config "stream_auto_select" || echo 0)
    stream_auto_select_interval=$(uci_get_config "stream_auto_select_interval" || echo 30)
    stream_auto_select_netflix=$(uci_get_config "stream_auto_select_netflix" || echo 0)
@@ -401,6 +408,14 @@ fi
          [ "$(expr "$CFG_UPDATE_INT" % "$cfg_update_interval")" -eq 0 ] && /usr/share/openclash/openclash.sh
       fi
       CFG_UPDATE_INT=$(expr "$CFG_UPDATE_INT" + 1)
+   fi
+
+## Efan 订阅循环更新
+   if [ "$efan_auto_update" -eq 1 ]; then
+      if [ "$EFAN_UPDATE_INT" -ne 0 ]; then
+         [ "$(expr "$EFAN_UPDATE_INT" % "$efan_update_interval")" -eq 0 ] && /usr/share/openclash/openclash_efan_update.sh >/dev/null 2>&1 &
+      fi
+      EFAN_UPDATE_INT=$(expr "$EFAN_UPDATE_INT" + 1)
    fi
 
 ##STREAMING_UNLOCK_CHECK

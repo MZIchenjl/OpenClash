@@ -145,6 +145,60 @@ class OpenClashEfanTest < Minitest::Test
     assert_equal "last-known-good\n", File.binread(config)
   end
 
+  def test_refresh_all_updates_every_remembered_account_without_exposing_identifiers
+    write_cache_for("first@example.com", [service(101, "First A", "service-token-a"), service(102, "First B", "service-token-b")])
+    write_cache_for("second@example.com", [service(201, "Second", "service-token-c")])
+    app = fixture_app_data([
+      {"id" => 1, "name" => "Visible", "show" => 1, "sort_order" => 1}
+    ], {"Visible" => [fixture_uri("all")]})
+    tokens = []
+    stub_http_request do |_method, _path, options|
+      tokens << options[:token]
+      OpenClashEfan::HttpResult.new(200, JSON.generate(app), 0, "")
+    end
+
+    result = OpenClashEfan.refresh_all
+
+    assert_equal "ok", result["status"]
+    assert_equal "logged_in", result["session_state"]
+    assert_equal 2, result["account_count"]
+    assert_equal 3, result["service_count"]
+    assert_equal 3, result["ready_count"]
+    assert_equal %w[service-token-a service-token-b service-token-c], tokens
+    refute_includes JSON.generate(result), "@"
+    assert File.file?(OpenClashEfan.all_config_path("first@example.com"))
+    assert File.file?(OpenClashEfan.all_config_path("second@example.com"))
+  end
+
+  def test_refresh_all_is_a_noop_without_remembered_accounts
+    result = OpenClashEfan.refresh_all
+
+    assert_equal "ok", result["status"]
+    assert_equal "logged_out", result["session_state"]
+    assert_equal 0, result["account_count"]
+    assert_equal 0, result["service_count"]
+  end
+
+  def test_refresh_all_deletes_only_token_invalid_account_cache
+    write_cache
+    config = OpenClashEfan.config_path("user@example.com", 101)
+    File.write(config, "last-known-good\n")
+    stub_http_request do |_method, _path, _options|
+      OpenClashEfan::HttpResult.new(401, "{}", 0, "")
+    end
+
+    result = OpenClashEfan.refresh_all
+
+    assert_equal "error", result["status"]
+    assert_equal "expired", result["session_state"]
+    assert_equal "service_auth_invalid", result["error"]
+    assert_equal 1, result["auth_invalid_count"]
+    assert_equal 0, result["remaining_account_count"]
+    refute_includes JSON.generate(result), "@"
+    refute File.exist?(OpenClashEfan.account_path("user@example.com"))
+    assert_equal "last-known-good\n", File.binread(config)
+  end
+
   def test_logout_only_deletes_account_cache
     write_cache
     config = OpenClashEfan.config_path("user@example.com", 101)
@@ -225,8 +279,12 @@ class OpenClashEfanTest < Minitest::Test
   end
 
   def write_cache
-    cache = {"schema" => 1, "email" => "user@example.com", "services" => [service(101, "First", "service-token-a")], "updated_at" => 1}
-    OpenClashEfan.atomic_write(OpenClashEfan.account_path("user@example.com"), JSON.pretty_generate(cache) + "\n")
+    write_cache_for("user@example.com", [service(101, "First", "service-token-a")])
+  end
+
+  def write_cache_for(email, services)
+    cache = {"schema" => 1, "email" => email, "services" => services, "updated_at" => 1}
+    OpenClashEfan.atomic_write(OpenClashEfan.account_path(email), JSON.pretty_generate(cache) + "\n")
   end
 
   def stub_http_request(&block)

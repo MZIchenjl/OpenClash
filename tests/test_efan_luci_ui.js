@@ -10,6 +10,24 @@ const templatePath = path.join(
   "../luci-app-openclash/luasrc/view/openclash/efan_login.htm"
 );
 const template = fs.readFileSync(templatePath, "utf8");
+const settings = fs.readFileSync(path.join(
+  __dirname,
+  "../luci-app-openclash/luasrc/model/cbi/openclash/settings.lua"
+), "utf8");
+const watchdog = fs.readFileSync(path.join(
+  __dirname,
+  "../luci-app-openclash/root/usr/share/openclash/openclash_watchdog.sh"
+), "utf8");
+const updater = fs.readFileSync(path.join(
+  __dirname,
+  "../luci-app-openclash/root/usr/share/openclash/openclash_efan_update.sh"
+), "utf8");
+
+assert(settings.includes('Flag, "efan_auto_update"'), "Efan auto-update switch is missing");
+assert(settings.includes('Value, "efan_update_interval"'), "Efan update interval is missing");
+assert(settings.includes('o:depends("efan_auto_update", "1")'), "Efan interval must depend on its switch");
+assert(watchdog.includes('openclash_efan_update.sh'), "watchdog does not schedule Efan updates");
+assert(updater.includes('refresh-all'), "Efan updater does not refresh remembered accounts");
 const match = template.match(/<script[^>]*>([\s\S]*?)<\/script>/);
 assert(match, "Efan template script is missing");
 
