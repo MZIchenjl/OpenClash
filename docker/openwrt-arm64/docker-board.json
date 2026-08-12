@@ -1,0 +1,7 @@
+{
+  "model": {
+    "id": "docker,openwrt-arm64",
+    "name": "OpenWrt ARM64 Docker"
+  },
+  "network": {}
+}

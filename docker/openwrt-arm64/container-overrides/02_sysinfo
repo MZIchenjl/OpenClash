@@ -1,0 +1,13 @@
+do_sysinfo_generic() {
+	# Docker Desktop 可能暴露空的 /proc/device-tree 目录；容器板级信息已由
+	# /etc/board.json 提供，无需读取实体设备树。
+	[ -e /.dockerenv ] && return
+	[ -r /proc/device-tree/compatible ] || return
+	mkdir -p /tmp/sysinfo
+	[ -e /tmp/sysinfo/board_name ] || \
+		echo "$(strings /proc/device-tree/compatible | head -1)" > /tmp/sysinfo/board_name
+	[ ! -e /tmp/sysinfo/model -a -e /proc/device-tree/model ] && \
+		echo "$(cat /proc/device-tree/model)" > /tmp/sysinfo/model
+}
+
+boot_hook_add preinit_main do_sysinfo_generic

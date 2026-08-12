@@ -63,6 +63,13 @@ efan-*.json
 efan-*.yaml
 efan-*.yml
 
+# Local OpenWrt Docker build/runtime artifacts and private snapshots
+docker/openwrt-arm64/.cache/
+docker/openwrt-arm64/artifacts/
+docker/openwrt-arm64/snapshots/
+docker/openwrt-arm64/.env
+docker/openwrt-arm64/.secrets/
+
 # Patch files (unless intentional)
 *.orig
 *.rej

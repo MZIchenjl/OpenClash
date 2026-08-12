@@ -1,0 +1,30 @@
+mixed-port: 7890
+mode: rule
+log-level: info
+external-controller: 0.0.0.0:9090
+
+proxies:
+  - name: x365-结构校验
+    type: x365
+    server: 192.0.2.1
+    port: 443
+    uuid: 00112233-4455-6677-8899-aabbccddeeff
+    host: authority.example
+    path: /tunnel
+    sni: reality.example
+    transport: h2
+    client-fingerprint: chrome
+    reality-opts:
+      public-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      short-id: 0123456789abcdef
+    udp: true
+
+proxy-groups:
+  - name: 代理选择
+    type: select
+    proxies:
+      - x365-结构校验
+      - DIRECT
+
+rules:
+  - MATCH,代理选择
