@@ -10,6 +10,10 @@ const templatePath = path.join(
   "../luci-app-openclash/luasrc/view/openclash/efan_login.htm"
 );
 const template = fs.readFileSync(templatePath, "utf8");
+const packageMakefile = fs.readFileSync(path.join(
+  __dirname,
+  "../luci-app-openclash/Makefile"
+), "utf8");
 const settings = fs.readFileSync(path.join(
   __dirname,
   "../luci-app-openclash/luasrc/model/cbi/openclash/settings.lua"
@@ -24,6 +28,7 @@ const updater = fs.readFileSync(path.join(
 ), "utf8");
 
 assert(settings.includes('Flag, "efan_auto_update"'), "Efan auto-update switch is missing");
+assert(packageMakefile.includes('+ruby-gems +ruby-base64'), "Efan runtime must load packaged Ruby gems");
 assert(settings.includes('Value, "efan_update_interval"'), "Efan update interval is missing");
 assert(settings.includes('o:depends("efan_auto_update", "1")'), "Efan interval must depend on its switch");
 assert(watchdog.includes('openclash_efan_update.sh'), "watchdog does not schedule Efan updates");
