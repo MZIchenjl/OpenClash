@@ -23,6 +23,15 @@ config_checksum() {
    [ -f "$1" ] && md5sum "$1" 2>/dev/null | awk '{print $1}'
 }
 
+record_update_state() {
+   update_status="$1"
+   update_now=$(date +%s)
+   uci -q set openclash.config.efan_last_update_attempt="$update_now"
+   uci -q set openclash.config.efan_last_update_status="$update_status"
+   [ "$update_status" = "success" ] && uci -q set openclash.config.efan_last_update_time="$update_now"
+   uci -q commit openclash
+}
+
 set_lock || exit 0
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
@@ -53,14 +62,19 @@ FAILED_COUNT=${FAILED_COUNT:-0}
 AUTH_INVALID_COUNT=${AUTH_INVALID_COUNT:-0}
 
 if [ "$RUBY_STATUS" -ne 0 ] || [ -z "$RESULT_STATUS" ]; then
+   record_update_state "failed"
    LOG_WARN "Efan automatic subscription update failed before a valid result was returned."
 elif [ "$ACCOUNT_COUNT" -eq 0 ]; then
+   record_update_state "no_account"
    LOG_INFO "Efan automatic subscription update skipped: no remembered account."
 elif [ "$RESULT_STATUS" = "ok" ]; then
+   record_update_state "success"
    LOG_INFO "Efan automatic subscription update completed: ${READY_COUNT} service(s) refreshed across ${ACCOUNT_COUNT} account(s)."
 elif [ "$AUTH_INVALID_COUNT" -ne 0 ]; then
+   [ "$READY_COUNT" -gt 0 ] && record_update_state "partial" || record_update_state "failed"
    LOG_WARN "Efan automatic subscription update completed with errors: ${READY_COUNT} refreshed, ${FAILED_COUNT} failed, ${AUTH_INVALID_COUNT} token-invalid service(s). Token-invalid account caches were removed; YAML configurations were preserved."
 else
+   [ "$READY_COUNT" -gt 0 ] && record_update_state "partial" || record_update_state "failed"
    LOG_WARN "Efan automatic subscription update completed with errors: ${READY_COUNT} refreshed and ${FAILED_COUNT} failed. Account caches and last-known-good YAML configurations were preserved."
 fi
 

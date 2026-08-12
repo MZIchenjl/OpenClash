@@ -1434,12 +1434,45 @@ o = s:taboption("efan", Flag, "efan_auto_update", translate("Auto Update Efan Su
 o.description = translate("Automatically refresh every remembered Efan account and all of its services. An invalid token removes the account cache but preserves generated YAML configurations.")
 o.default = 0
 
-o = s:taboption("efan", Value, "efan_update_interval", translate("Update Interval(min)"))
-o.description = translate("The automatic refresh runs while OpenClash is enabled. If an active Efan configuration changes, OpenClash restarts to apply it.")
-o.default = "60"
-o.datatype = "range(5,10080)"
+o = s:taboption("efan", ListValue, "efan_update_week_time", translate("Update Time (Every Week)"))
+o:value("*", translate("Every Day"))
+o:value("1", translate("Every Monday"))
+o:value("2", translate("Every Tuesday"))
+o:value("3", translate("Every Wednesday"))
+o:value("4", translate("Every Thursday"))
+o:value("5", translate("Every Friday"))
+o:value("6", translate("Every Saturday"))
+o:value("0", translate("Every Sunday"))
+o.default = "1"
 o:depends("efan_auto_update", "1")
-o.rmempty = true
+
+o = s:taboption("efan", ListValue, "efan_update_day_time", translate("Update time (every day)"))
+for t = 0,23 do
+o:value(t, t..":00")
+end
+o.default = "3"
+o:depends("efan_auto_update", "1")
+
+local efan_last_success = tonumber(uci:get("openclash", "config", "efan_last_update_time") or "")
+local efan_last_attempt = tonumber(uci:get("openclash", "config", "efan_last_update_attempt") or "")
+local efan_last_status = uci:get("openclash", "config", "efan_last_update_status") or "never"
+local efan_status_labels = {
+	success = translate("Success"),
+	partial = translate("Partially failed"),
+	failed = translate("Failed"),
+	no_account = translate("No remembered account"),
+	never = translate("Never")
+}
+local efan_last_update_text = translate("Last successful update:").." "..(efan_last_success and os.date("%Y-%m-%d %H:%M:%S", efan_last_success) or translate("Never"))
+if efan_last_attempt then
+	efan_last_update_text = efan_last_update_text.."<br/>"..translate("Last run:").." "..os.date("%Y-%m-%d %H:%M:%S", efan_last_attempt).."（"..(efan_status_labels[efan_last_status] or translate("Unknown")).."）"
+end
+
+o = s:taboption("efan", DummyValue, "_efan_last_update", translate("Last Automatic Update"))
+o.rawhtml = true
+function o.cfgvalue()
+	return efan_last_update_text
+end
 
 efan_panel = s:taboption("efan", DummyValue, "", nil)
 efan_panel.template = "openclash/efan_login"

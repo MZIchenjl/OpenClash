@@ -4093,10 +4093,262 @@ msgid "oixCloud Checkin Failed! Please Check And Try Again..."
 msgstr "oixCloud 签到失败，请稍后再试！"
 
 msgid "Account Email Address"
-msgstr "账号地址"
+msgstr "账号邮箱"
 
 msgid "Account Password"
 msgstr "账号密码"
+
+msgid "Efan Account"
+msgstr "Efan 账号"
+
+msgid "Auto Update Efan Subscriptions"
+msgstr "自动更新 Efan 订阅"
+
+msgid "Automatically refresh every remembered Efan account and all of its services. An invalid token removes the account cache but preserves generated YAML configurations."
+msgstr "按计划刷新路由器中记住的全部 Efan 账号及其所有服务。令牌失效时删除账号缓存，但保留已经生成的 YAML 配置。"
+
+msgid "Last Automatic Update"
+msgstr "上次自动更新"
+
+msgid "Last successful update:"
+msgstr "上次成功更新时间："
+
+msgid "Last run:"
+msgstr "上次执行时间："
+
+msgid "Success"
+msgstr "成功"
+
+msgid "Partially failed"
+msgstr "部分失败"
+
+msgid "Failed"
+msgstr "失败"
+
+msgid "No remembered account"
+msgstr "没有已记住的账号"
+
+msgid "Never"
+msgstr "从未更新"
+
+msgid "Account State"
+msgstr "账号状态"
+
+msgid "Checking router cache..."
+msgstr "正在检查路由器缓存..."
+
+msgid "Not logged in"
+msgstr "未登录"
+
+msgid "Logged in"
+msgstr "已登录"
+
+msgid "Refreshing services..."
+msgstr "正在更新服务..."
+
+msgid "Logging out..."
+msgstr "正在退出..."
+
+msgid "Login expired"
+msgstr "登录已失效"
+
+msgid "Status unavailable"
+msgstr "暂时无法读取状态"
+
+msgid "Login"
+msgstr "登录"
+
+msgid "Refresh all services"
+msgstr "更新全部服务"
+
+msgid "Login fetches every service in the account, creates one independent Mihomo YAML configuration per service, and creates an all-services configuration with normal selectable proxy groups. The account and service tokens are remembered on this router; passwords are never cached."
+msgstr "登录后会拉取账号下的全部服务，为每个服务生成独立的 Mihomo YAML 配置，并生成带有可选择策略组的全部服务配置。账号和服务令牌会保存在本路由器中，密码绝不会缓存。"
+
+msgid "Service ID"
+msgstr "服务 ID"
+
+msgid "Service Name"
+msgstr "服务名称"
+
+msgid "Account Status"
+msgstr "账号状态"
+
+msgid "Fetch Status"
+msgstr "拉取状态"
+
+msgid "Nodes"
+msgstr "节点数"
+
+msgid "Configuration File"
+msgstr "配置文件"
+
+msgid "Updated"
+msgstr "已更新"
+
+msgid "Cached"
+msgstr "使用缓存"
+
+msgid "Not fetched"
+msgstr "尚未拉取"
+
+msgid "Token expired"
+msgstr "令牌已失效"
+
+msgid "All services (selectable groups)"
+msgstr "全部服务（可选择策略组）"
+
+msgid "services"
+msgstr "个服务"
+
+msgid "ready"
+msgstr "个就绪"
+
+msgid "failed"
+msgstr "个失败"
+
+msgid "all-services configuration ready"
+msgstr "全部服务配置已就绪"
+
+msgid "Active"
+msgstr "有效"
+
+msgid "Pending"
+msgstr "待生效"
+
+msgid "Suspended"
+msgstr "已暂停"
+
+msgid "Cancelled"
+msgstr "已取消"
+
+msgid "Terminated"
+msgstr "已终止"
+
+msgid "Expired"
+msgstr "已过期"
+
+msgid "LuCI session expired; reload this page and sign in again."
+msgstr "LuCI 会话已过期，请刷新页面后重新登录。"
+
+msgid "LuCI endpoint returned a non-JSON response"
+msgstr "LuCI 接口返回了非 JSON 响应"
+
+msgid "unknown content type"
+msgstr "未知内容类型"
+
+msgid "Cannot reach the LuCI Efan endpoint"
+msgstr "无法连接 LuCI 的 Efan 接口"
+
+msgid "Efan operation failed"
+msgstr "Efan 操作失败"
+
+msgid "Every service configuration was refreshed."
+msgstr "全部服务配置已更新。"
+
+msgid "Logged in. Every service configuration is ready."
+msgstr "登录成功，全部服务配置均已就绪。"
+
+msgid "Service token expired. The account cache was removed; cached YAML files were preserved. Log in again."
+msgstr "服务令牌已失效，账号缓存已删除，已有 YAML 配置已保留，请重新登录。"
+
+msgid "Some services failed to refresh; successful services and last-known-good configurations were preserved."
+msgstr "部分服务更新失败；已成功更新的服务和上一次可用配置均已保留。"
+
+msgid "No service could be refreshed. The login is still cached and last-known-good configurations were preserved."
+msgstr "所有服务均更新失败；登录缓存和上一次可用配置仍然保留。"
+
+msgid "Logging in and fetching every service..."
+msgstr "正在登录并拉取全部服务..."
+
+msgid "Refreshing every service..."
+msgstr "正在更新全部服务..."
+
+msgid "No Efan account is logged in on this router."
+msgstr "本路由器当前没有已登录的 Efan 账号。"
+
+msgid "Cannot read Efan account status"
+msgstr "无法读取 Efan 账号状态"
+
+msgid "Logged out. The account and token cache was deleted; generated YAML configurations were preserved."
+msgstr "已退出登录，账号及令牌缓存已删除，生成的 YAML 配置已保留。"
+
+msgid "Logout failed"
+msgstr "退出登录失败"
+
+msgid "Efan API address is invalid"
+msgstr "Efan API 地址无效"
+
+msgid "Email address is invalid"
+msgstr "邮箱地址无效"
+
+msgid "Password is required"
+msgstr "必须输入密码"
+
+msgid "Service information is invalid"
+msgstr "服务信息无效"
+
+msgid "Cannot save the router cache"
+msgstr "无法保存路由器缓存"
+
+msgid "The x365-capable Mihomo core is not installed"
+msgstr "尚未安装支持 x365 的 Mihomo 内核"
+
+msgid "The generated Mihomo configuration did not pass validation"
+msgstr "生成的 Mihomo 配置未通过校验"
+
+msgid "No account is logged in"
+msgstr "当前没有已登录账号"
+
+msgid "The account cache is invalid"
+msgstr "账号缓存无效"
+
+msgid "The request header is invalid"
+msgstr "请求头无效"
+
+msgid "The server response is too large"
+msgstr "服务器响应过大"
+
+msgid "Cannot connect to the Efan service"
+msgstr "无法连接 Efan 服务"
+
+msgid "The server response is invalid"
+msgstr "服务器响应无效"
+
+msgid "The service configuration is invalid"
+msgstr "服务配置无效"
+
+msgid "Cannot decrypt the service configuration"
+msgstr "无法解密服务配置"
+
+msgid "The x365 node is invalid"
+msgstr "x365 节点无效"
+
+msgid "Login failed; check the account and password"
+msgstr "登录失败，请检查账号和密码"
+
+msgid "The service token has expired"
+msgstr "服务令牌已失效"
+
+msgid "Some services failed to update"
+msgstr "部分服务更新失败"
+
+msgid "The Efan client is not installed"
+msgstr "尚未安装 Efan 客户端"
+
+msgid "Cannot start the Efan client"
+msgstr "无法启动 Efan 客户端"
+
+msgid "The Efan client returned an invalid response"
+msgstr "Efan 客户端返回了无效响应"
+
+msgid "Internal processing error"
+msgstr "内部处理错误"
+
+msgid "LuCI returned an invalid response"
+msgstr "LuCI 返回了无效响应"
+
+msgid "Efan service returned an HTTP error"
+msgstr "Efan 服务返回 HTTP 错误"
 
 msgid "Checkin Multiple"
 msgstr "签到倍数"
@@ -4358,4 +4610,3 @@ msgstr "版本号"
 
 msgid "to update individually"
 msgstr "则独立更新"
-

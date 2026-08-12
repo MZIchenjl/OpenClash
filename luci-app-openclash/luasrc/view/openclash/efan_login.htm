@@ -6,6 +6,17 @@
 	#efan-panel .efan-status-warning { color: #c78300; }
 	#efan-panel .efan-status-error { color: #d34a4a; }
 	#efan-panel .efan-actions .btn { margin: .2rem .35rem .2rem 0; }
+	#efan-panel .efan-table-wrap { margin-top: 1rem; overflow-x: auto; width: 100%; }
+	#efan-panel #efan-services { border: 1px solid rgba(127, 127, 127, .35); border-collapse: collapse; min-width: 58rem; width: 100%; }
+	#efan-panel #efan-services th,
+	#efan-panel #efan-services td { border: 1px solid rgba(127, 127, 127, .35); padding: .65rem .75rem; text-align: left; vertical-align: top; }
+	#efan-panel #efan-services th { background: rgba(127, 127, 127, .12); font-weight: 600; white-space: nowrap; }
+	#efan-panel #efan-services tbody tr:nth-child(even) { background: rgba(127, 127, 127, .05); }
+	#efan-panel #efan-services td:nth-child(1),
+	#efan-panel #efan-services td:nth-child(3),
+	#efan-panel #efan-services td:nth-child(4),
+	#efan-panel #efan-services td:nth-child(5) { white-space: nowrap; }
+	#efan-panel #efan-services td:last-child { overflow-wrap: anywhere; word-break: break-word; }
 </style>
 
 <div class="cbi-section" id="efan-panel">
@@ -33,26 +44,28 @@
 	</div>
 	<div class="cbi-value">
 		<div class="cbi-value-field efan-actions">
-			<button type="button" class="btn cbi-button cbi-button-apply" id="efan-login-button" onclick="EfanAccount.login()"><%:Login and fetch all services%></button>
+			<button type="button" class="btn cbi-button cbi-button-apply" id="efan-login-button" onclick="EfanAccount.login()"><%:Login%></button>
 			<button type="button" class="btn cbi-button cbi-button-reload" id="efan-refresh-button" style="display:none" disabled onclick="EfanAccount.refresh()"><%:Refresh all services%></button>
 			<button type="button" class="btn cbi-button cbi-button-remove" id="efan-logout-button" style="display:none" disabled onclick="EfanAccount.logout()"><%:Logout Account%></button>
 		</div>
 	</div>
 
 	<div id="efan-message" class="alert-message notice" style="display:none"></div>
-	<table class="table" id="efan-services" style="display:none">
-		<thead>
-			<tr>
-				<th><%:Service ID%></th>
-				<th><%:Service Name%></th>
-				<th><%:Account Status%></th>
-				<th><%:Fetch Status%></th>
-				<th><%:Nodes%></th>
-				<th><%:Configuration File%></th>
-			</tr>
-		</thead>
-		<tbody></tbody>
-	</table>
+	<div class="efan-table-wrap" id="efan-services-wrap" style="display:none">
+		<table class="table" id="efan-services">
+			<thead>
+				<tr>
+					<th><%:Service ID%></th>
+					<th><%:Service Name%></th>
+					<th><%:Account Status%></th>
+					<th><%:Fetch Status%></th>
+					<th><%:Nodes%></th>
+					<th><%:Configuration File%></th>
+				</tr>
+			</thead>
+			<tbody></tbody>
+		</table>
+	</div>
 </div>
 
 <script type="text/javascript">//<![CDATA[
@@ -166,7 +179,7 @@ var EfanAccount = {
 			try {
 				result = JSON.parse(request.responseText);
 			} catch (e) {
-				var contentType = request.getResponseHeader('Content-Type') || 'unknown content type';
+				var contentType = request.getResponseHeader('Content-Type') || '<%:unknown content type%>';
 				var message = (request.status === 401 || request.status === 403)
 					? '<%:LuCI session expired; reload this page and sign in again.%>'
 					: '<%:LuCI endpoint returned a non-JSON response%>' + ' (HTTP ' + String(request.status || 0) + ', ' + contentType + ')';
@@ -190,12 +203,47 @@ var EfanAccount = {
 			error: '<%:Failed%>', auth_invalid: '<%:Token expired%>'
 		};
 		var text = labels[status] || status;
-		if (service.error) text += ' (' + service.error + ')';
+		if (service.error) text += ' (' + this.errorLabel(service.error) + ')';
 		return text;
+	},
+
+	accountStatus: function(status) {
+		var labels = {
+			Active: '<%:Active%>', active: '<%:Active%>', Pending: '<%:Pending%>', pending: '<%:Pending%>',
+			Suspended: '<%:Suspended%>', suspended: '<%:Suspended%>', Cancelled: '<%:Cancelled%>', cancelled: '<%:Cancelled%>',
+			Canceled: '<%:Cancelled%>', canceled: '<%:Cancelled%>', Terminated: '<%:Terminated%>', terminated: '<%:Terminated%>',
+			Expired: '<%:Expired%>', expired: '<%:Expired%>'
+		};
+		return labels[status] || status || '';
+	},
+
+	errorLabel: function(code) {
+		var labels = {
+			invalid_api_host: '<%:Efan API address is invalid%>', invalid_email: '<%:Email address is invalid%>',
+			invalid_password: '<%:Password is required%>', invalid_service: '<%:Service information is invalid%>',
+			storage_error: '<%:Cannot save the router cache%>', mihomo_missing: '<%:The x365-capable Mihomo core is not installed%>',
+			mihomo_validation_failed: '<%:The generated Mihomo configuration did not pass validation%>',
+			not_logged_in: '<%:No account is logged in%>', invalid_cache: '<%:The account cache is invalid%>',
+			invalid_header: '<%:The request header is invalid%>', response_too_large: '<%:The server response is too large%>',
+			network_error: '<%:Cannot connect to the Efan service%>', invalid_response: '<%:The server response is invalid%>',
+			invalid_config: '<%:The service configuration is invalid%>', decrypt_failed: '<%:Cannot decrypt the service configuration%>',
+			invalid_node: '<%:The x365 node is invalid%>', login_failed: '<%:Login failed; check the account and password%>',
+			service_auth_invalid: '<%:The service token has expired%>', refresh_failed: '<%:Some services failed to update%>',
+			client_missing: '<%:The Efan client is not installed%>', spawn_failed: '<%:Cannot start the Efan client%>',
+			invalid_client_response: '<%:The Efan client returned an invalid response%>', internal_error: '<%:Internal processing error%>',
+			luci_network_error: '<%:Cannot reach the LuCI Efan endpoint%>', invalid_http_response: '<%:LuCI returned an invalid response%>'
+		};
+		return labels[code] || (/^http_[0-9]+$/.test(code || '') ? '<%:Efan service returned an HTTP error%>' : (code || '<%:Unknown error%>'));
+	},
+
+	resultMessage: function(result, fallback) {
+		if (result && result.error) return this.errorLabel(result.error);
+		return (result && result.message) || fallback;
 	},
 
 	render: function(result) {
 		var table = document.getElementById('efan-services');
+		var wrapper = document.getElementById('efan-services-wrap');
 		var body = table.querySelector('tbody');
 		while (body.firstChild) body.removeChild(body.firstChild);
 		var services = result && Array.isArray(result.services) ? result.services.slice(0) : [];
@@ -211,7 +259,7 @@ var EfanAccount = {
 			var values = [
 				service.id == null ? '' : String(service.id),
 				service.name || '',
-				service.account_status || '',
+				self.accountStatus(service.account_status),
 				self.serviceStatus(service),
 				service.nodes == null ? '' : String(service.nodes),
 				service.config || ''
@@ -223,7 +271,7 @@ var EfanAccount = {
 			});
 			body.appendChild(row);
 		});
-		table.style.display = services.length ? '' : 'none';
+		wrapper.style.display = services.length ? '' : 'none';
 	},
 
 	authenticatedResult: function(result, operation) {
@@ -236,7 +284,7 @@ var EfanAccount = {
 		}
 		if (result.status !== 'ok' || result.session_state !== 'logged_in') {
 			this.setState('error', result);
-			this.message(result.message || result.error || '<%:Efan operation failed%>', 'error');
+			this.message(this.resultMessage(result, '<%:Efan operation failed%>'), 'error');
 			return;
 		}
 		if (result.email) {
@@ -301,7 +349,7 @@ var EfanAccount = {
 				return;
 			}
 			self.setState('error', result);
-			self.message(result.message || result.error || '<%:Cannot read Efan account status%>', 'error');
+			self.message(self.resultMessage(result, '<%:Cannot read Efan account status%>'), 'error');
 		});
 	},
 
@@ -319,7 +367,7 @@ var EfanAccount = {
 				self.message('<%:Logged out. The account and token cache was deleted; generated YAML configurations were preserved.%>', 'notice');
 			} else {
 				self.setState('logged_in');
-				self.message(result.message || result.error || '<%:Logout failed%>', 'error');
+				self.message(self.resultMessage(result, '<%:Logout failed%>'), 'error');
 			}
 		});
 	}

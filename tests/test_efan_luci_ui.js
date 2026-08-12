@@ -22,17 +22,39 @@ const watchdog = fs.readFileSync(path.join(
   __dirname,
   "../luci-app-openclash/root/usr/share/openclash/openclash_watchdog.sh"
 ), "utf8");
+const initScript = fs.readFileSync(path.join(
+  __dirname,
+  "../luci-app-openclash/root/etc/init.d/openclash"
+), "utf8");
 const updater = fs.readFileSync(path.join(
   __dirname,
   "../luci-app-openclash/root/usr/share/openclash/openclash_efan_update.sh"
 ), "utf8");
+const chinesePo = fs.readFileSync(path.join(
+  __dirname,
+  "../luci-app-openclash/po/zh-cn/openclash.zh-cn.po"
+), "utf8");
 
 assert(settings.includes('Flag, "efan_auto_update"'), "Efan auto-update switch is missing");
 assert(packageMakefile.includes('+ruby-gems +ruby-base64'), "Efan runtime must load packaged Ruby gems");
-assert(settings.includes('Value, "efan_update_interval"'), "Efan update interval is missing");
-assert(settings.includes('o:depends("efan_auto_update", "1")'), "Efan interval must depend on its switch");
-assert(watchdog.includes('openclash_efan_update.sh'), "watchdog does not schedule Efan updates");
+assert(settings.includes('ListValue, "efan_update_week_time"'), "Efan weekly schedule is missing");
+assert(settings.includes('ListValue, "efan_update_day_time"'), "Efan daily hour is missing");
+assert(settings.includes('DummyValue, "_efan_last_update"'), "Efan last-update display is missing");
+assert(!settings.includes('"efan_update_interval"'), "legacy minute interval is still visible");
+assert(initScript.includes('openclash_efan_update.sh #openclash-cron-task'), "OpenClash cron does not schedule Efan updates");
+assert(initScript.includes('efan_update_week_time'), "Efan cron has no weekday field");
+assert(initScript.includes('efan_update_day_time'), "Efan cron has no hour field");
+assert(!watchdog.includes('EFAN_UPDATE_INT'), "watchdog still contains the legacy minute scheduler");
 assert(updater.includes('refresh-all'), "Efan updater does not refresh remembered accounts");
+assert(updater.includes('efan_last_update_time'), "Efan updater does not save its last successful update");
+assert(updater.includes('efan_last_update_status'), "Efan updater does not save its last status");
+assert(chinesePo.includes('msgid "Efan Account"\nmsgstr "Efan 账号"'), "Efan tab has no Chinese translation");
+assert(chinesePo.includes('msgid "Refresh all services"\nmsgstr "更新全部服务"'), "Efan refresh button has no Chinese translation");
+assert(chinesePo.includes('msgid "Last Automatic Update"\nmsgstr "上次自动更新"'), "Efan last-update label has no Chinese translation");
+assert(template.includes('id="efan-login-button" onclick="EfanAccount.login()"><%:Login%>'), "Efan login button is not concise");
+assert(!template.includes('<%:Login and fetch all services%>'), "legacy login button text is still used");
+assert(template.includes('class="efan-table-wrap"'), "Efan services are not wrapped as a responsive table");
+assert(template.includes('border-collapse: collapse'), "Efan services table has no visible grid styling");
 const match = template.match(/<script[^>]*>([\s\S]*?)<\/script>/);
 assert(match, "Efan template script is missing");
 
@@ -81,6 +103,7 @@ const elementIds = [
   "efan-refresh-button",
   "efan-logout-button",
   "efan-message",
+  "efan-services-wrap",
   "efan-services"
 ];
 const elements = Object.fromEntries(elementIds.map((id) => [id, new FakeElement(id)]));
@@ -153,8 +176,11 @@ assert.strictEqual(elements["efan-refresh-button"].disabled, true);
 assert.strictEqual(elements["efan-logout-button"].disabled, true);
 
 account.render(loggedIn);
-assert.strictEqual(elements["efan-services"].style.display, "");
+assert.strictEqual(elements["efan-services-wrap"].style.display, "");
 assert.strictEqual(elements["efan-services"].tbody.children.length, 2);
+assert.strictEqual(account.accountStatus("Active"), "translated");
+assert.strictEqual(account.errorLabel("login_failed"), "translated");
+assert.strictEqual(account.errorLabel("http_503"), "translated");
 
 account.authenticatedResult({
   status: "error",

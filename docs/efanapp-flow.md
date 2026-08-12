@@ -180,6 +180,8 @@ rules:
 
 ### 自动更新
 
-Efan Account 页提供独立的“Auto Update Efan Subscriptions”开关和分钟周期（5–10080 分钟，默认 60 分钟）。设置保存在 OpenClash UCI 的 `efan_auto_update` 与 `efan_update_interval` 字段中。OpenClash 运行期间，watchdog 按周期调用专用更新任务；任务会刷新路由器中记住的全部 Efan 账号，并对每个账号拉取全部 service。
+“Efan 账号”页提供独立的“自动更新 Efan 订阅”开关，并采用与 GEOIP 更新相同的“每周星期几 + 每天几点”选择方式。设置保存在 OpenClash UCI 的 `efan_auto_update`、`efan_update_week_time` 与 `efan_update_day_time` 字段中。OpenClash 会把任务写入自身管理的 crontab；任务会刷新路由器中记住的全部 Efan 账号，并对每个账号拉取全部 service。
+
+页面同时显示上次成功更新时间、上次执行时间和执行状态。自动任务将这些信息持久化在 `efan_last_update_time`、`efan_last_update_attempt` 与 `efan_last_update_status` 中。失败或部分失败不会覆盖上次成功更新时间。
 
 自动任务使用独立文件锁防止重叠。若服务鉴权失效，账号 Token 缓存按既有规则删除，已经生成的 YAML 继续保留；若当前活动配置是 `efan-*.yaml` 且内容确实发生变化，则通过 OpenClash 的任务计数器安排安全重启，使新配置生效。自动任务日志仅记录账号和服务数量，不记录邮箱、Token 或密码。
