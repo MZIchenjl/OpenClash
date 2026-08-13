@@ -1,8 +1,6 @@
 name: Compile The New Clash Core
 
 on:
-  schedule:
-    - cron: "0 20 * * 1,3,5,6"
   workflow_dispatch:
   
 jobs:
@@ -36,16 +34,22 @@ jobs:
           current_smart_ver=$(sed -n '2p' ./dev/core_version 2>/dev/null || echo "null")
           echo "current_smart_id=$current_smart_ver" >> $GITHUB_OUTPUT
           echo "current_smart_id: $current_smart_ver"
+
+      - name: Checkout OpenClash source and pinned Mihomo
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+          path: OpenClashSource
+          submodules: recursive
       
       - name: Get Upstream Version
         id: upstream_id
         run: |
-          # MetaCubeX/mihomo
-          git clone --depth=1 --branch=Alpha https://github.com/MetaCubeX/mihomo.git metacubex_mihomo
-          cd metacubex_mihomo
+          # The Meta version is pinned by the OpenClash repository's submodule.
+          cd OpenClashSource/mihomo
           echo "upstream_id=alpha-g$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "upstream_id: alpha-g$(git rev-parse --short HEAD)"
-          cd ..
+          cd ../..
           # vernesong/mihomo
           git clone --depth=1 --branch=Alpha https://github.com/vernesong/mihomo.git vernesong_mihomo
           cd vernesong_mihomo
@@ -59,7 +63,7 @@ jobs:
     strategy:
       matrix:
         core:
-          - { type: meta,  repo: MetaCubeX/mihomo, src: metacubex_src, version_prefix: alpha-g,       artifact: meta-core,  goversion: '1.26' }
+          - { type: meta,  repo: '',                src: mihomo,        version_prefix: alpha-g,       artifact: meta-core,  goversion: '1.26' }
           - { type: smart, repo: vernesong/mihomo,  src: vernesong_src, version_prefix: alpha-smart-g, artifact: smart-core, goversion: '1.26' }
         jobs:
           - { goos: linux, goarch: '386',      output: '386',                   upxflag: '--lzma --best' }
@@ -83,6 +87,12 @@ jobs:
           - { goos: linux, goarch: loong64,            output: loong64-abi2,     upxflag: '--lzma --best' }
           - { goos: linux, goarch: loong64, abi: '1',  output: loong64-abi1,     upxflag: '--lzma --best' }
     steps:
+      - name: Checkout OpenClash source and pinned Mihomo
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+          submodules: recursive
+
       - name: Check if build needed
         id: check_skip
         run: |
@@ -145,7 +155,7 @@ jobs:
           echo "/usr/local/go/bin" >> $GITHUB_PATH
 
       - name: Clone source (${{ matrix.core.type }})
-        if: ${{ steps.check_skip.outputs.skip != 'true' }}
+        if: ${{ steps.check_skip.outputs.skip != 'true' && matrix.core.type != 'meta' }}
         uses: actions/checkout@v6
         with:
           repository: ${{ matrix.core.repo }}

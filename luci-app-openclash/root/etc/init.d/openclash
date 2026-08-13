@@ -584,11 +584,8 @@ do_run_file()
    fi
 
    [ ! -f "$CLASH" ] || { [ "$core_type" = "Smart" ] && [ -z "$($CLASH -v | grep 'smart')" ] && [ -z "$($CLASH -v | grep 'oix')" ]; } || { [ "$core_type" = "Oix" ] && [ -z "$($CLASH -v | grep 'oix')" ]; } && {
-      LOG_TIP "【$core_type】Core is not Detected installed, Ready to Download..."
-      /usr/share/openclash/openclash_core.sh "$core_type"
-      if [ ! -f "$meta_core_path" ]; then
-         start_fail
-      fi
+      LOG_ERROR "【$core_type】Core is not installed or does not match the selected type. Build and install it from the pinned Mihomo submodule."
+      start_fail
    }
 
    if [ "$china_ip_route" != "0" ] || [ "$china_ip6_route" != "0" ] || [ "$disable_udp_quic" = "1" ]; then

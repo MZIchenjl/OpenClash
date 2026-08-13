@@ -3022,7 +3022,7 @@
                 NetworkStatsManager.resetStats();
             }
         }
-        clashversion_check();
+        installedversion_load();
     });
 
     DarkModeDetector.init();
@@ -3038,8 +3038,6 @@
         UsageHelpManager.init();
         loadAnnouncement();
     }, 300);
-
-    setTimeout(function() { check_core(); }, 1000);
 
     window.addEventListener('beforeunload', function() {
         WSManager.closeAll();
@@ -3592,72 +3590,7 @@
         winOpen('https://ko-fi.com/vernesong');
     }
 
-    function clashversion_check() {
-        function compareVersions(v1, v2) {
-            if (!v1 || !v2) return 0;
-            var ver1 = v1.replace(/^v/, '').split('.');
-            var ver2 = v2.replace(/^v/, '').split('.');
-
-            var maxLen = Math.max(ver1.length, ver2.length);
-            while (ver1.length < maxLen) ver1.push('0');
-            while (ver2.length < maxLen) ver2.push('0');
-
-            for (var i = 0; i < maxLen; i++) {
-                var num1 = parseInt(ver1[i], 10) || 0;
-                var num2 = parseInt(ver2[i], 10) || 0;
-                if (num1 > num2) return 1;
-                if (num1 < num2) return -1;
-            }
-            return 0;
-        }
-
-        function updateCoreDot(corelv) {
-            if (DOMCache.core_version_display.classList.contains('oc-hidden')) return;
-            var coremetacv = DOMCache.core_version_text.textContent;
-            var hasUpdate = corelv && corelv !== "" && corelv !== "loading..." && corelv !== coremetacv;
-            var existingDot = DOMCache.core_version_display.querySelector('.update-dot');
-            if (hasUpdate) {
-                if (!existingDot) {
-                    var updateDot = document.createElement('span');
-                    updateDot.className = 'update-dot';
-                    DOMCache.core_version_display.appendChild(updateDot);
-                }
-                DOMCache.core_version_display.title = '<%:New version available%>: ' + corelv;
-                DOMCache.core_version_text.removeAttribute('title');
-            } else {
-                if (existingDot) {
-                    existingDot.remove();
-                }
-                DOMCache.core_version_display.title = '';
-            }
-        }
-
-        function updatePluginDot(oplv) {
-            if (DOMCache.plugin_version_display.classList.contains('oc-hidden')) return;
-            var opcv = DOMCache.plugin_version_text.textContent;
-            var hasUpdate = false;
-            if (oplv && oplv !== "" && oplv !== "loading...") {
-                if (compareVersions(oplv, opcv) > 0) {
-                    hasUpdate = true;
-                }
-            }
-            var existingDot = DOMCache.plugin_version_display.querySelector('.update-dot');
-            if (hasUpdate) {
-                if (!existingDot) {
-                    var updateDot = document.createElement('span');
-                    updateDot.className = 'update-dot';
-                    DOMCache.plugin_version_display.appendChild(updateDot);
-                }
-                DOMCache.plugin_version_display.title = '<%:New version available%>: ' + oplv;
-                DOMCache.plugin_version_text.removeAttribute('title');
-            } else {
-                if (existingDot) {
-                    existingDot.remove();
-                }
-                DOMCache.plugin_version_display.title = '';
-            }
-        }
-
+    function installedversion_load() {
         StateManager.cachedXHRGet('<%=luci.dispatcher.build_url("admin", "services", "openclash", "update")%>', function(x, status) {
             if (x && x.status == 200) {
                 if (status.coremetacv && status.coremetacv !== "0") {
@@ -3688,20 +3621,7 @@
                     DOMCache.plugin_version_display.title = '';
                 }
             }
-            checkLatestVersions();
         });
-
-        function checkLatestVersions() {
-            StateManager.cachedXHRGet('<%=luci.dispatcher.build_url("admin", "services", "openclash", "last_version")%>', function(x, data) {
-                if (x && x.status == 200 && data) {
-                    updateCoreDot(data.corelv);
-                    updatePluginDot(data.oplv);
-                } else {
-                    updateCoreDot('');
-                    updatePluginDot('');
-                }
-            });
-        }
     }
 
     function logo_error(imgobj, imgSrc) {

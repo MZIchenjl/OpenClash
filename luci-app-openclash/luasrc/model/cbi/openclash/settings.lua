@@ -78,7 +78,6 @@ s:tab("chnr_update", translate("Chnroute Update"))
 s:tab("auto_restart", translate("Auto Restart"))
 s:tab("debug", translate("Core Tests"))
 s:tab("developer", translate("Developer Settings"))
-s:tab("version_update", translate("Version Update"))
 s:tab("efan", translate("Efan Account"))
 s:tab("oixcloud", translate("oixCloud"))
 
@@ -1393,11 +1392,6 @@ function o.write(self, section, value)
 	end
 	return true
 end
-
----- version update
-version_update_panel = s:taboption("version_update", DummyValue, "", nil)
-version_update_panel.template = "openclash/update"
-version_update_panel.version_tab = true
 
 ---- developer
 o = s:taboption("developer", Value, "firewall_custom")
