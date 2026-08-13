@@ -351,7 +351,7 @@ var OixCloud = {
 
 		var onLoginSuccess = function() {
 			btns.forEach(function(b){ setBtnBusy(b, false); });
-			var info = '<%:oixCloud Login Successful%>' + ', <%:Note: oixCloud need a specific core installed, OpenClash will auto download, After the core start, an oixCloud nodes provider will be added, which you can customize as needed%>';
+			var info = '<%:oixCloud Login Successful%>' + ', <%:Note: oixCloud uses the core bundled with this OpenClash package. The nodes provider will be added after OpenClash restarts.%>';
 			OixMsg.show(info, 'success', 20000);
 			self.loggedIn = true; self.showLoggedIn(); self.loadAccountInfo(); self.startPolling(); self.fetchParams();
 		};

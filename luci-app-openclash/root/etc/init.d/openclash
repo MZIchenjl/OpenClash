@@ -526,8 +526,10 @@ do_run_file()
       mv "/etc/openclash/geoip.dat" "/etc/openclash/GeoIP.dat"
    }
 
-   if [ "$small_flash_memory" != "1" ]; then
-      meta_core_path="/etc/openclash/core/clash_meta"
+	# The architecture-specific package owns clash_meta. Keep it on persistent
+	# storage even in small-flash mode; runtime code must never move or replace it.
+	meta_core_path="/etc/openclash/core/clash_meta"
+	if [ "$small_flash_memory" != "1" ]; then
       ipdb_path="/etc/openclash/Country.mmdb"
       chnr_path="/etc/openclash/china_ip_route.ipset"
       chnr6_path="/etc/openclash/china_ip6_route.ipset"
@@ -542,13 +544,11 @@ do_run_file()
       mv "/tmp/etc/openclash/GeoIP.dat" "$geoip_path"
       mv "/tmp/etc/openclash/ASN.mmdb" "$asn_path"
       mv "/tmp/etc/openclash/Model.bin" "$lgbm_path"
-      mv "/tmp/etc/openclash/core/" "/etc/openclash"
-      if [ "$CACHE_PATH" != "/tmp/etc/openclash/cache.db" ]; then
+		if [ "$CACHE_PATH" != "/tmp/etc/openclash/cache.db" ]; then
          rm -rf "/tmp/etc/openclash"
       fi
    else
-      meta_core_path="/tmp/etc/openclash/core/clash_meta"
-      ipdb_path="/tmp/etc/openclash/Country.mmdb"
+		ipdb_path="/tmp/etc/openclash/Country.mmdb"
       chnr_path="/tmp/etc/openclash/china_ip_route.ipset"
       chnr6_path="/tmp/etc/openclash/china_ip6_route.ipset"
       geosite_path="/tmp/etc/openclash/GeoSite.dat"
@@ -562,8 +562,7 @@ do_run_file()
       [ ! -h "/etc/openclash/GeoIP.dat" ] && mv "/etc/openclash/GeoIP.dat" "$geoip_path"
       [ ! -h "/etc/openclash/ASN.mmdb" ] && mv "/etc/openclash/ASN.mmdb" "$asn_path"
       [ ! -h "/etc/openclash/Model.bin" ] && mv "/etc/openclash/Model.bin" "$lgbm_path"
-      mv "/etc/openclash/core/" "/tmp/etc/openclash"
-   fi
+	fi
 
    rm -rf "/etc/openclash/cache.db"
    rm -rf "/etc/openclash/clash"
@@ -3591,7 +3590,13 @@ get_config()
 
 start_service()
 {
-   enable=$(uci_get_config "enable")
+	if [ -f "/tmp/openclash-package-upgrade-skip-start" ]; then
+		rm -f "/tmp/openclash-package-upgrade-skip-start"
+		LOG_TIP "OpenClash Was Stopped Before Package Upgrade, Skip Starting..."
+		exit 0
+	fi
+
+	enable=$(uci_get_config "enable")
    [ "$enable" != "1" ] && LOG_WARN "OpenClash Now Disabled, Need Start From Luci Page, Exit..." && exit 0
 
    if procd_running "openclash" >/dev/null; then

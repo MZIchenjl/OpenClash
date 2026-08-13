@@ -6,10 +6,15 @@ SETTINGS="$ROOT_DIR/luci-app-openclash/luasrc/model/cbi/openclash/settings.lua"
 STATUS="$ROOT_DIR/luci-app-openclash/luasrc/view/openclash/status.htm"
 CONTROLLER="$ROOT_DIR/luci-app-openclash/luasrc/controller/openclash.lua"
 INIT="$ROOT_DIR/luci-app-openclash/root/etc/init.d/openclash"
+UCI_DEFAULTS="$ROOT_DIR/luci-app-openclash/root/etc/uci-defaults/luci-openclash"
 PLUGIN_UPDATER="$ROOT_DIR/luci-app-openclash/root/usr/share/openclash/openclash_update.sh"
 CORE_UPDATER="$ROOT_DIR/luci-app-openclash/root/usr/share/openclash/openclash_core.sh"
+CONFIG_MODEL="$ROOT_DIR/luci-app-openclash/luasrc/model/cbi/openclash/config.lua"
+UPLOAD_VIEW="$ROOT_DIR/luci-app-openclash/luasrc/view/openclash/upload.htm"
+UPDATE_VIEW="$ROOT_DIR/luci-app-openclash/luasrc/view/openclash/update.htm"
 SUBMODULES="$ROOT_DIR/.gitmodules"
 CORE_WORKFLOW="$ROOT_DIR/.github/workflows/compile_meta_core.yml"
+MAKEFILE="$ROOT_DIR/luci-app-openclash/Makefile"
 
 if grep -q 'tab("version_update"' "$SETTINGS"; then
   echo "online update tab is still registered" >&2
@@ -21,7 +26,7 @@ if grep -q 'last_version' "$STATUS"; then
   exit 1
 fi
 
-for route in last_version opupdate coreupdate core_download one_key_update version_history addr_info; do
+for route in last_version opupdate coreupdate core_download one_key_update version_history addr_info check_core remove_all_core backup_only_core backup_ex_core; do
   if grep -q "entry({\"admin\", \"services\", \"openclash\", \"$route\"}" "$CONTROLLER"; then
     echo "online update route is still registered: $route" >&2
     exit 1
@@ -33,8 +38,29 @@ if grep -q 'openclash_core.sh "$core_type"' "$INIT"; then
   exit 1
 fi
 
+grep -q 'OPENCLASH_UPGRADE_WAS_RUNNING' "$UCI_DEFAULTS"
+grep -q '/etc/init.d/openclash restart' "$UCI_DEFAULTS"
+grep -q 'openclash-package-upgrade-skip-start' "$UCI_DEFAULTS"
+grep -q 'openclash-package-upgrade-skip-start' "$INIT"
+grep -q '/etc/openclash-upgrade-backup' "$MAKEFILE"
+grep -q 'backup-complete' "$MAKEFILE"
+grep -q 'PKG_UPGRADE:-0' "$MAKEFILE"
+if grep -q 'cp -f "/etc/config/openclash" "/tmp/openclash.bak"' "$MAKEFILE"; then
+  echo "package upgrade still relies on a volatile /tmp configuration backup" >&2
+  exit 1
+fi
+
 grep -q 'Online OpenClash updates are disabled' "$PLUGIN_UPDATER"
-grep -q 'Online core updates are disabled' "$CORE_UPDATER"
+[ ! -e "$CORE_UPDATER" ]
+[ ! -e "$UPDATE_VIEW" ]
+if grep -q 'value="clash_meta"' "$UPLOAD_VIEW" || grep -q 'fp == "clash_meta"' "$CONFIG_MODEL"; then
+  echo "manual core upload is still available" >&2
+  exit 1
+fi
+if grep -qE 'openclash_core\.sh|core_download|remove_all_core|backup_only_core|backup_ex_core' "$CONTROLLER" "$STATUS"; then
+  echo "core management code is still exposed" >&2
+  exit 1
+fi
 grep -q 'path = mihomo' "$SUBMODULES"
 grep -q 'url = https://github.com/MZIchenjl/mihomo.git' "$SUBMODULES"
 grep -q 'branch = feat/x365' "$SUBMODULES"
@@ -47,7 +73,6 @@ if grep -q 'github.com/MetaCubeX/mihomo.git' "$CORE_WORKFLOW"; then
 fi
 
 sh -n "$PLUGIN_UPDATER"
-sh -n "$CORE_UPDATER"
 sh -n "$INIT"
 
 echo "manual-update-only checks passed"

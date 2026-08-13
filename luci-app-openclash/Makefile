@@ -62,6 +62,7 @@ define Build/Prepare
 		po2lmo $(po) $(PKG_BUILD_DIR)/$(patsubst %.po,%.lmo,$(notdir $(po)));)
 	chmod 0755 $(PKG_BUILD_DIR)/root/etc/init.d/openclash
 	chmod 0755 $(PKG_BUILD_DIR)/root/etc/openclash/core/clash_meta
+	chmod 0755 $(PKG_BUILD_DIR)/root/usr/share/openclash/openclash_package_upgrade.sh
 	chmod -R 0755 $(PKG_BUILD_DIR)/root/usr/share/openclash/
 	exit 0
 endef
@@ -73,16 +74,53 @@ define Build/Compile
 endef
 
 define Package/$(PKG_NAME)/conffiles
+/etc/config/openclash
 endef
 
 define Package/$(PKG_NAME)/preinst
 #!/bin/sh
-	if [ -f "/etc/config/openclash" ] && [ ! -f "/tmp/openclash.bak" ]; then
-		cp -f "/etc/config/openclash" "/tmp/openclash.bak" >/dev/null 2>&1
-		cp -rf "/etc/openclash" "/tmp/openclash" >/dev/null 2>&1
-		cp -rf "/usr/share/openclash/ui" "/tmp/openclash_ui" >/dev/null 2>&1
-		cp -rf "/www/luci-static/resources/openclash/pac" "/tmp/pac" >/dev/null 2>&1
+	[ "$${PKG_UPGRADE:-0}" = "1" ] || exit 0
+	if [ -x "/usr/share/openclash/openclash_package_upgrade.sh" ]; then
+		/usr/share/openclash/openclash_package_upgrade.sh backup || exit 1
+		exit 0
 	fi
+
+	# First upgrade from an upstream package: the helper is not installed yet,
+	# so create the same verified persistent backup inline. Any failure aborts
+	# the package transaction instead of silently continuing without settings.
+	BACKUP_DIR="/etc/openclash-upgrade-backup"
+	STAGING_DIR="$${BACKUP_DIR}.new"
+	PREVIOUS_DIR="$${BACKUP_DIR}.previous"
+	[ -f "/etc/config/openclash" ] || exit 1
+	rm -rf "$${STAGING_DIR}" || exit 1
+	mkdir -p "$${STAGING_DIR}" || exit 1
+	cp -p "/etc/config/openclash" "$${STAGING_DIR}/openclash.uci" || exit 1
+	printf '%s\n' './core' './core/*' 'core' 'core/*' > "$${STAGING_DIR}/core.exclude" || exit 1
+	if [ -d "/etc/openclash" ]; then
+		tar -C "/etc/openclash" -X "$${STAGING_DIR}/core.exclude" -czf "$${STAGING_DIR}/openclash-data.tar.gz" . || exit 1
+	else
+		tar -czf "$${STAGING_DIR}/openclash-data.tar.gz" -T /dev/null || exit 1
+	fi
+	if tar -tzf "$${STAGING_DIR}/openclash-data.tar.gz" | grep -q '^\./core\(/\|$$\)'; then
+		exit 1
+	fi
+	(
+		cd "$${STAGING_DIR}" || exit 1
+		sha256sum openclash.uci openclash-data.tar.gz > checksums
+	) || exit 1
+	if pidof clash >/dev/null 2>&1; then
+		echo 1 > "$${STAGING_DIR}/was-running" || exit 1
+	else
+		echo 0 > "$${STAGING_DIR}/was-running" || exit 1
+	fi
+	touch "$${STAGING_DIR}/backup-complete" || exit 1
+	rm -rf "$${PREVIOUS_DIR}" || exit 1
+	[ ! -e "$${BACKUP_DIR}" ] || mv "$${BACKUP_DIR}" "$${PREVIOUS_DIR}" || exit 1
+	if ! mv "$${STAGING_DIR}" "$${BACKUP_DIR}"; then
+		[ -e "$${BACKUP_DIR}" ] || [ ! -e "$${PREVIOUS_DIR}" ] || mv "$${PREVIOUS_DIR}" "$${BACKUP_DIR}"
+		exit 1
+	fi
+	rm -rf "$${PREVIOUS_DIR}" || exit 1
 	exit 0
 endef
 
@@ -93,13 +131,7 @@ endef
 
 define Package/$(PKG_NAME)/prerm
 #!/bin/sh
-	[ -n "$(pidof clash)" ] && /etc/init.d/openclash stop 2>/dev/null
-	if [ -f "/etc/config/openclash" ] && [ ! -f "/tmp/openclash.bak" ]; then
-		cp -f "/etc/config/openclash" "/tmp/openclash.bak" >/dev/null 2>&1
-		cp -rf "/etc/openclash" "/tmp/openclash" >/dev/null 2>&1
-		cp -rf "/usr/share/openclash/ui" "/tmp/openclash_ui" >/dev/null 2>&1
-		cp -rf "/www/luci-static/resources/openclash/pac" "/tmp/pac" >/dev/null 2>&1
-	fi
+	[ -n "$$(pidof clash)" ] && /etc/init.d/openclash stop 2>/dev/null
 	exit 0
 endef
 

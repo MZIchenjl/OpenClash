@@ -40,6 +40,9 @@ and upgrade-safe form `0.47.156-r1`. For another x365 packaging revision, increm
 `X365_REVISION` and `PKG_RELEASE`. When OpenClash advances, update `PKG_VERSION`, reset the
 release to `1`, and refresh `build-info`.
 
-During an APK upgrade, OpenClash configuration and user data are restored from the normal
-pre-upgrade backup, but the backed-up `clash_meta` is deliberately excluded. This ensures
-that the core bundled in the new APK replaces the previous pinned core.
+During an APK upgrade, OpenClash configuration and user data are written to a verified,
+persistent backup under `/etc/openclash-upgrade-backup`. The backup never contains
+`/etc/openclash/core`; core download, upload, backup, restore, and removal functions are
+not exposed because `clash_meta` is owned exclusively by the architecture-specific APK.
+After restoration, OpenClash is restarted only when it was running before the upgrade.
+Failed restores or restarts retain the persistent backup for recovery.

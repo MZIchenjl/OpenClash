@@ -18,9 +18,7 @@ if fs.uci_get_config("config", "oix_token") and fs.uci_get_config("config", "oix
 end
 m:append(Template("openclash/myip"))
 m:append(Template("openclash/developer"))
-m:append(Template("openclash/update"))
 m:append(Template("openclash/config_edit"))
 m:append(Template("openclash/config_upload"))
 
 return m
-

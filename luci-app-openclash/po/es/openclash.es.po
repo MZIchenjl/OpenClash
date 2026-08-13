@@ -4002,8 +4002,8 @@ msgstr "Registrando..."
 msgid "oixCloud Login Successful"
 msgstr "Inicio de sesión en oixCloud exitoso"
 
-msgid "Note: oixCloud need a specific core installed, OpenClash will auto download, After the core start, an oixCloud nodes provider will be added, which you can customize as needed"
-msgstr "Nota: oixCloud requiere un núcleo específico. OpenClash lo descargará y añadirá un proveedor de nodos personalizable."
+msgid "Note: oixCloud uses the core bundled with this OpenClash package. The nodes provider will be added after OpenClash restarts."
+msgstr "Nota: oixCloud usa el núcleo incluido en este paquete de OpenClash. El proveedor de nodos se añadirá después de reiniciar OpenClash."
 
 msgid "oixCloud Login Failed"
 msgstr "Fallo al iniciar sesión en oixCloud"

@@ -1,0 +1,7 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      bash build-essential ca-certificates file gawk gettext git libncurses-dev \
+      libssl-dev perl python3 rsync unzip wget xz-utils zlib1g-dev \
+ && rm -rf /var/lib/apt/lists/*

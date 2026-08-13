@@ -2,6 +2,12 @@
 . /lib/functions.sh
 . /usr/share/openclash/uci.sh
 
+OPENCLASH_UPGRADE_RESTORED=0
+OPENCLASH_UPGRADE_WAS_RUNNING=0
+[ "$(cat /etc/openclash-upgrade-backup/was-running 2>/dev/null)" = "1" ] && OPENCLASH_UPGRADE_WAS_RUNNING=1
+[ "$(cat /etc/openclash-upgrade-backup.previous/was-running 2>/dev/null)" = "1" ] && OPENCLASH_UPGRADE_WAS_RUNNING=1
+pidof clash >/dev/null 2>&1 && OPENCLASH_UPGRADE_WAS_RUNNING=1
+
 [ -e "/etc/config/ucitrack" ] && {
 uci -q delete ucitrack.@openclash[-1]
 uci -q add ucitrack openclash
@@ -158,29 +164,15 @@ cp -f "/etc/openclash/china_ip6_route.ipset" "/usr/share/openclash/backup/china_
 cp -f "/etc/openclash/overwrite/default" "/usr/share/openclash/backup/overwrite/default" >/dev/null 2>&1
 cp -f "/etc/openclash/rule_provider/oc-cn-domain.mrs" "/usr/share/openclash/backup/oc-cn-domain.mrs" >/dev/null 2>&1
 
-#Restore
-if [ -f "/tmp/openclash.bak" ]; then
-	#delete old geosite database first
-	if [ "/etc/openclash/GeoSite.dat" -nt "/tmp/openclash/GeoSite.dat" ]; then
-		rm -rf "/tmp/openclash/GeoSite.dat" >/dev/null 2>&1
+# Restore configuration and user data, but never restore a core. The persistent
+# backup is used for upgrades from this package; /tmp is supported for the first
+# upgrade from the upstream package.
+if [ -f "/etc/openclash-upgrade-backup/backup-complete" ] || [ -f "/etc/openclash-upgrade-backup.previous/backup-complete" ] || [ -f "/tmp/openclash.bak" ]; then
+	if ! /usr/share/openclash/openclash_package_upgrade.sh restore; then
+		logger -t openclash-upgrade "Configuration restore failed; backup retained"
+		exit 1
 	fi
-	#delete error china_ip_route first
-	if [ -n "$FW4" ]; then
-		if [ -z "$(cat "/tmp/openclash/china_ip_route.ipset" |grep "define china_ip_route")" ]; then
-			rm -f "/tmp/openclash/china_ip_route.ipset" >/dev/null 2>&1
-			rm -f "/tmp/openclash/china_ip6_route.ipset" >/dev/null 2>&1
-		fi
-	else
-		if [ -z "$(cat "/tmp/openclash/china_ip_route.ipset" |grep "create china_ip_route")" ]; then
-			rm -f "/tmp/openclash/china_ip_route.ipset" >/dev/null 2>&1
-			rm -f "/tmp/openclash/china_ip6_route.ipset" >/dev/null 2>&1
-		fi
-	fi
-	mv -f "/tmp/openclash.bak" "/etc/config/openclash" >/dev/null 2>&1
-	# clash_meta is owned by this architecture-specific package. Do not let the
-	# pre-upgrade backup replace the core that was installed by the new APK.
-	rm -f "/tmp/openclash/core/clash_meta" >/dev/null 2>&1
-	cp -rf "/tmp/openclash/." "/etc/openclash/" >/dev/null 2>&1
+	OPENCLASH_UPGRADE_RESTORED=1
 	#ui
 	if [ -d "/tmp/openclash_ui/" ]; then
 		if [ -d "/tmp/openclash_ui/metacubexd/" ] || [ -d "/tmp/openclash_ui/zashboard/" ] || [ -d "/tmp/openclash_ui/yacd/" ] || [ -d "/tmp/openclash_ui/dashboard/" ]; then
@@ -200,13 +192,9 @@ if [ -f "/tmp/openclash.bak" ]; then
 		cp -f "/usr/share/openclash/backup/oc-cn-domain.mrs" "/etc/openclash/rule_provider/oc-cn-domain.mrs" >/dev/null 2>&1
 	fi
 	rm -rf "/etc/openclash/openclash" >/dev/null 2>&1
-	rm -rf "/tmp/openclash" >/dev/null 2>&1
-	rm -rf "/tmp/openclash.bak" >/dev/null 2>&1
 	#old version files
 	rm -rf "/etc/openclash/fake_filter.list" >/dev/null 2>&1
 	rm -rf "/etc/openclash/openclash_servers_fake_filter.conf" >/dev/null 2>&1
-	rm -rf "/etc/openclash/core/clash" >/dev/null 2>&1
-	rm -rf "/etc/openclash/core/clash_tun" >/dev/null 2>&1
 	rm -rf "/etc/openclash/accelerated-domains.china.conf" >/dev/null 2>&1
 	rm -rf "/etc/openclash/custom/openclash_force_sniffing_domain.yaml" >/dev/null 2>&1
 	rm -rf "/etc/openclash/custom/openclash_sniffing_ports_filter.yaml" >/dev/null 2>&1
@@ -278,6 +266,21 @@ sed -i '/.*kB maximum content size*/c\HTTP_MAX_CONTENT = 1024*10240		-- 100 kB m
 sed -i '/.*kB maximum content size*/c\export let HTTP_MAX_CONTENT = 1024*10240;		// 100 kB maximum content size' /usr/share/ucode/luci/http.uc >/dev/null 2>&1
 
 /etc/init.d/uhttpd restart >/dev/null 2>&1
+
+if [ "$OPENCLASH_UPGRADE_RESTORED" = "1" ]; then
+	if [ "$OPENCLASH_UPGRADE_WAS_RUNNING" = "1" ]; then
+		if ! /etc/init.d/openclash restart >/dev/null 2>&1; then
+			logger -t openclash-upgrade "OpenClash restart failed; upgrade backup retained"
+			touch /etc/openclash-upgrade-backup/restart-required 2>/dev/null
+			exit 1
+		fi
+	else
+		# default_postinst calls every packaged init script. Consume this marker in
+		# start_service so a manually stopped instance remains stopped.
+		touch /tmp/openclash-package-upgrade-skip-start
+	fi
+	/usr/share/openclash/openclash_package_upgrade.sh cleanup
+fi
 
 rm -rf /tmp/luci-indexcache /tmp/luci-indexcache.* /var/luci-indexcache /var/luci-indexcache.* >/dev/null 2>&1
 rm -rf /tmp/luci-modulecache /var/luci-modulecache >/dev/null 2>&1

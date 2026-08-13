@@ -21,7 +21,7 @@ until [ "$(docker inspect --format '{{.State.Health.Status}}' openclash-openwrt-
   sleep 1
 done
 
-echo '[1/8] OpenWrt ARM64 与发行版'
+echo '[1/9] OpenWrt ARM64 与发行版'
 compose exec -T openwrt sh -c '
   board=$(ubus call system board)
   echo "$board" | jsonfilter -e "@.release.version" | grep -qx 25.12.5
@@ -31,7 +31,7 @@ compose exec -T openwrt sh -c '
   date +%z | grep -qx +0800
 '
 
-echo '[2/8] procd、ubus、rpcd、uhttpd 与 crond'
+echo '[2/9] procd、ubus、rpcd、uhttpd 与 crond'
 compose exec -T openwrt sh -c '
   ubus list | grep -qx service
   ubus list | grep -qx session
@@ -43,7 +43,7 @@ compose exec -T openwrt sh -c '
 http_code=$(curl --max-time 10 -k -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:$LUCI_HTTP_PORT/cgi-bin/luci/")
 case "$http_code" in 200|301|302|403) ;; *) echo "LuCI HTTP 状态异常: $http_code" >&2; exit 1;; esac
 
-echo '[3/8] OpenClash 与 Ruby 依赖'
+echo '[3/9] OpenClash 与 Ruby 依赖'
 compose exec -T openwrt sh -c '
   apk info -e luci-app-openclash >/dev/null
   apk list --installed luci-app-openclash 2>/dev/null | grep -q "^luci-app-openclash-0.47.156 "
@@ -56,7 +56,7 @@ compose exec -T openwrt sh -c '
   /usr/share/openclash/openclash_efan.rb status "" 2>/dev/null | jsonfilter -e "@.status" | grep -qx ok
 '
 
-echo '[4/8] Lua、Shell 与 Ruby 语法'
+echo '[4/9] Lua、Shell 与 Ruby 语法'
 compose exec -T openwrt sh -c '
   ruby -c /usr/share/openclash/openclash_efan.rb 2>/dev/null | grep -q "Syntax OK"
   sh -n /usr/share/openclash/openclash_efan_update.sh
@@ -66,14 +66,26 @@ compose exec -T openwrt sh -c '
   lua -e "assert(loadfile(\"/usr/lib/lua/luci/model/cbi/openclash/settings.lua\"))"
 '
 
-echo '[5/8] Mihomo ARM64 与 x365 配置解析'
+echo '[5/9] APK 升级配置事务与核心所有权'
+docker cp "$SCRIPT_DIR/../../tests/test_package_upgrade.sh" openclash-openwrt-arm64:/usr/libexec/test_package_upgrade.sh
+compose exec -T openwrt sh -c '
+  set -e
+  OPENCLASH_PACKAGE_UPGRADE_HELPER=/usr/share/openclash/openclash_package_upgrade.sh \
+  OPENCLASH_CORE_EXCLUDE_FILE=/usr/share/openclash/core-backup.exclude \
+    sh /usr/libexec/test_package_upgrade.sh
+  test ! -e /usr/share/openclash/openclash_core.sh
+  ! grep -q "value=\"clash_meta\"" /usr/lib/lua/luci/view/openclash/upload.htm
+  ! grep -qE "core_download|remove_all_core|backup_only_core|backup_ex_core" /usr/lib/lua/luci/controller/openclash.lua
+'
+
+echo '[6/9] Mihomo ARM64 与 x365 配置解析'
 docker cp "$SCRIPT_DIR/x365-smoke.yaml" openclash-openwrt-arm64:/tmp/x365-smoke.yaml
 compose exec -T openwrt sh -c '
   /etc/openclash/core/clash_meta -v | grep -q "linux arm64"
   /etc/openclash/core/clash_meta -d /tmp -t -f /tmp/x365-smoke.yaml
 '
 
-echo '[6/8] 当前容器配置校验（若存在）'
+echo '[7/9] 当前容器配置校验（若存在）'
 compose exec -T openwrt sh -c '
   active=$(uci -q get openclash.config.config_path || true)
   if [ -n "$active" ] && [ -f "$active" ]; then
@@ -83,7 +95,7 @@ compose exec -T openwrt sh -c '
   fi
 '
 
-echo '[7/8] LuCI 中文页面实际渲染'
+echo '[8/9] LuCI 中文页面实际渲染'
 luci_cookie=$(mktemp "$SCRIPT_DIR/.cache/luci-cookie.XXXXXX")
 luci_page=$(mktemp "$SCRIPT_DIR/.cache/luci-settings.XXXXXX")
 cleanup_luci_test() {
@@ -112,7 +124,7 @@ fi
 cleanup_luci_test
 trap - EXIT HUP INT TERM
 
-echo '[8/8] 敏感文件未进入 Git 与镜像构建上下文'
+echo '[9/9] 敏感文件未进入 Git 与镜像构建上下文'
 if git -C "$SCRIPT_DIR/../.." ls-files | grep -E '(^|/)(efan-[^/]+\.json|openclash-state\.tar\.gz)$' >/dev/null; then
   echo '发现不应提交的账号缓存或实机快照。' >&2
   exit 1

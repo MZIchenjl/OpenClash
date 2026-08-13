@@ -273,7 +273,6 @@
                                     <button class="dashboard-btn" id="_close_all_connection_btn"><%:Collecting data...%></button>
                                     <button class="dashboard-btn" id="_reload_firewall_btn"><%:Collecting data...%></button>
                                     <button class="dashboard-btn" id="_flush_dns_cache_btn"><%:Collecting data...%></button>
-                                    <button class="dashboard-btn" id="_one_key_update_btn"><%:Collecting data...%></button>
                                 </div>
                             </div>
                         </div>
@@ -351,7 +350,6 @@
         oclog: document.getElementById('_oclog'),
         close_all_connection: document.getElementById('_close_all_connection_btn'),
         reload_firewall: document.getElementById('_reload_firewall_btn'),
-        one_key_update: document.getElementById('_one_key_update_btn'),
         flush_dns_cache: document.getElementById('_flush_dns_cache_btn'),
         radio_mode: document.getElementById('radio-mode'),
         radio: document.getElementsByName("radios"),
@@ -2944,9 +2942,6 @@
             var flushCacheContent = status.clash ? '<input type="button" class="dashboard-btn" value="<%:Flush DNS%>" onclick="return b_flush_dns_cache(this)"/>' : '<input type="button" class="dashboard-btn" value="<%:Flush DNS Cache%>" onclick="event.preventDefault(); event.stopPropagation(); return false;"/>';
             updates.push({element: document.getElementById('_flush_dns_cache_btn'), content: flushCacheContent});
 
-            var oneKeyUpdateContent = '<input type="button" class="dashboard-btn" value="<%:Check Update%>" onclick="return all_one_key_update(this)"/>';
-            updates.push({element: document.getElementById('_one_key_update_btn'), content: oneKeyUpdateContent});
-
             StateManager.batchUpdateDOM(updates);
 
             if (!status.yacd) {
@@ -3487,14 +3482,6 @@
         memElement.innerHTML = data.inuse ? "<font style=\"color:var(--success-color)\">"+bytesToSize(data.inuse)+"</font>" : "<font style=\"color:var(--success-color)\">0 KB</font>";
     }
 
-    var all_one_key_update = debounceButton(function(btn) {
-        btn.value = '<%:Checking...%>';
-        update();
-        btn.value = '<%:Check Update%>';
-        btn.disabled = false;
-        return false;
-    });
-
     var b_flush_dns_cache = debounceButton(function(btn) {
         btn.disabled = true;
         btn.value = '<%:Flushing...%> ';
@@ -3626,19 +3613,6 @@
 
     function logo_error(imgobj, imgSrc) {
         imgobj.src = imgSrc;
-    }
-
-    function check_core() {
-        StateManager.cachedXHRGet('<%=luci.dispatcher.build_url("admin", "services", "openclash", "check_core")%>', function(x, status) {
-            if (x && x.status == 200) {
-                if (status.core_status != "1") {
-                    var r = confirm("<%:You have not installed the core yet, do you want to download and install it now?%>");
-                    if (r == true) {
-                        return update("core_download");
-                    }
-                }
-            }
-        });
     }
 
     function copyAddress() {

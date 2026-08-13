@@ -27,12 +27,9 @@ function index()
 	entry({"admin", "services", "openclash", "download_rule"}, call("action_download_rule"))
 	entry({"admin", "services", "openclash", "restore"}, call("action_restore_config"))
 	entry({"admin", "services", "openclash", "backup"}, call("action_backup"))
-	entry({"admin", "services", "openclash", "backup_ex_core"}, call("action_backup_ex_core"))
-	entry({"admin", "services", "openclash", "backup_only_core"}, call("action_backup_only_core"))
 	entry({"admin", "services", "openclash", "backup_only_config"}, call("action_backup_only_config"))
 	entry({"admin", "services", "openclash", "backup_only_rule"}, call("action_backup_only_rule"))
 	entry({"admin", "services", "openclash", "backup_only_proxy"}, call("action_backup_only_proxy"))
-	entry({"admin", "services", "openclash", "remove_all_core"}, call("action_remove_all_core"))
 	entry({"admin", "services", "openclash", "switch_mode"}, call("action_switch_mode"))
 	entry({"admin", "services", "openclash", "op_mode"}, call("action_op_mode"))
 	entry({"admin", "services", "openclash", "sub_info_get"}, call("sub_info_get"))
@@ -59,7 +56,6 @@ function index()
 	entry({"admin", "services", "openclash", "manual_stream_unlock_test"}, call("manual_stream_unlock_test"))
 	entry({"admin", "services", "openclash", "all_proxies_stream_test"}, call("all_proxies_stream_test"))
 	entry({"admin", "services", "openclash", "set_subinfo_url"}, call("set_subinfo_url"))
-	entry({"admin", "services", "openclash", "check_core"}, call("action_check_core"))
 	entry({"admin", "services", "openclash", "announcement"}, call("action_announcement"))
 	entry({"admin", "services", "openclash", "settings"},cbi("openclash/settings"),_("Plugin Settings"), 30).leaf = true
 	entry({"admin", "services", "openclash", "config-overwrite"},cbi("openclash/config-overwrite"),_("Overwrite Settings"), 40).leaf = true
@@ -196,14 +192,6 @@ local function coremodel()
 	end
 end
 
-local function check_core()
-	if not fs.access(meta_core_path) then
-		return "0"
-	else
-		return "1"
-	end
-end
-
 local function parse_subconverter_version_url(raw_url)
 	raw_url = (raw_url or ""):gsub("^%s+", ""):gsub("%s+$", "")
 	if raw_url == "" then return nil, "empty" end
@@ -285,29 +273,6 @@ local function corever()
 	return fs.uci_get_config("config", "core_version") or "0"
 end
 
-local function corelv()
-	local core_meta_lv = ""
-	local core_smart_enable = fs.uci_get_config("config", "smart_enable") or "0"
-	local oix_token = fs.uci_get_config("config", "oix_token") or ""
-
-	local cache = ov.fetch_version_history(release_branch(), false)
-	if cache then
-		if oix_token ~= "" then
-			core_meta_lv = cache.oix_ver or ""
-		elseif core_smart_enable == "1" then
-			core_meta_lv = (cache.core_smart and cache.core_smart[1] and cache.core_smart[1].version) or ""
-		else
-			core_meta_lv = (cache.core_meta and cache.core_meta[1] and cache.core_meta[1].version) or ""
-		end
-	end
-
-	if core_meta_lv and core_meta_lv ~= "" then
-		return core_meta_lv
-	end
-
-	return "loading..."
-end
-
 local function opcv()
 	local v
 	local info = opkg and opkg.info("luci-app-openclash")
@@ -327,28 +292,6 @@ local function opcv()
 	end
 end
 
-local function oplv()
-	local oplv = ""
-
-	local cache = ov.fetch_version_history(release_branch(), false)
-	if cache and cache.plugin and cache.plugin[1] and cache.plugin[1].version then
-		return cache.plugin[1].version
-	end
-
-	return "loading..."
-end
-
-local function opup()
-	return SYS.call("bash /usr/share/openclash/openclash_update.sh >/dev/null 2>&1 &")
-end
-
-local function coreup()
-	uci:set("openclash", "config", "enable", "1")
-	uci:commit("openclash")
-	local type = HTTP.formvalue("core_type")
-	return SYS.call(string.format("/usr/share/openclash/openclash_core.sh '%s' >/dev/null 2>&1 &", type))
-end
-
 local function save_corever_branch()
 	if HTTP.formvalue("core_ver") then
 		uci:set("openclash", "config", "core_version", HTTP.formvalue("core_ver"))
@@ -361,18 +304,6 @@ local function save_corever_branch()
 	end
 	uci:commit("openclash")
 	return "success"
-end
-
-function core_download()
-	local download_url = HTTP.formvalue("download_url")
-	local core_type = is_oix() and "Oix" or "Meta"
-
-	if download_url and download_url ~= "" then
-		SYS.call(string.format("bash /usr/share/openclash/openclash_core.sh '%s' '%s' >/dev/null 2>&1 &", core_type, download_url))
-	else
-		SYS.call(string.format("bash /usr/share/openclash/openclash_core.sh '%s' >/dev/null 2>&1 &", core_type))
-	end
-
 end
 
 function action_flush_dns_cache()
@@ -457,39 +388,6 @@ function action_restore_config()
 	SYS.call("cp -f /usr/share/openclash/backup/overwrite/default /etc/openclash/overwrite/default >/dev/null 2>&1 &")
 	SYS.call("cp -f /usr/share/openclash/backup/oc-cn-domain.mrs /etc/openclash/rule_provider/oc-cn-domain.mrs >/dev/null 2>&1 &")
 	SYS.call("rm -rf /etc/openclash/history/* >/dev/null 2>&1 &")
-end
-
-function action_remove_all_core()
-	SYS.call("rm -rf /etc/openclash/core/* >/dev/null 2>&1")
-end
-
-function action_one_key_update()
-	local cdn_url = HTTP.formvalue("url")
-	local download_url = HTTP.formvalue("download_url")
-	local version = HTTP.formvalue("version")
-	local sha = HTTP.formvalue("sha")
-	local update_type = HTTP.formvalue("update_type")
-
-	if update_type == "plugin" then
-		if download_url and download_url ~= "" then
-			return SYS.call(string.format("bash /usr/share/openclash/openclash_update.sh 'plugin_update' '%s' '%s' >/dev/null 2>&1 &",
-				cdn_url or "", download_url))
-		elseif cdn_url and cdn_url ~= "" then
-			return SYS.call(string.format("bash /usr/share/openclash/openclash_update.sh 'plugin_update' '%s' >/dev/null 2>&1 &", cdn_url))
-		else
-			return SYS.call("bash /usr/share/openclash/openclash_update.sh 'plugin_update' >/dev/null 2>&1 &")
-		end
-	end
-
-	if download_url and download_url ~= "" then
-		-- Full download URL: pass as $3 to the update script
-		return SYS.call(string.format("bash /usr/share/openclash/openclash_update.sh 'one_key_update' '%s' '%s' >/dev/null 2>&1 &",
-			cdn_url or "", download_url))
-	elseif cdn_url and cdn_url ~= "" then
-		return SYS.call(string.format("bash /usr/share/openclash/openclash_update.sh 'one_key_update' '%s' >/dev/null 2>&1 &", cdn_url))
-	else
-		return SYS.call("bash /usr/share/openclash/openclash_update.sh 'one_key_update' >/dev/null 2>&1 &")
-	end
 end
 
 local function config_name()
@@ -1345,13 +1243,6 @@ function action_save_corever_branch()
 	})
 end
 
-function action_one_key_update_check()
-	HTTP.prepare_content("application/json")
-	HTTP.write_json({
-		corever = corever();
-	})
-end
-
 function action_dashboard_type()
 	local dashboard_type = fs.uci_get_config("config", "dashboard_type") or "Official"
 	local yacd_type = fs.uci_get_config("config", "yacd_type") or "Official"
@@ -1690,7 +1581,6 @@ end
 local START_SCRIPT_PATTERNS = {
 	["init"] = "/etc/init.d/[o]penclash",
 	["openclash.sh"] = "[o]penclash\\.sh",
-	["openclash_core.sh"] = "[o]penclash_core\\.sh",
 	["openclash_update.sh"] = "[o]penclash_update\\.sh",
 }
 
@@ -1820,35 +1710,6 @@ function action_save_github_address_mod()
 	HTTP.prepare_content("application/json")
 	HTTP.write_json({
 		success = true;
-	})
-end
-
-function action_last_version()
-	HTTP.prepare_content("application/json")
-	HTTP.write_json({
-		corelv = corelv(),
-		oplv = oplv();
-	})
-end
-
-function action_opupdate()
-	HTTP.prepare_content("application/json")
-	HTTP.write_json({
-		opup = opup();
-	})
-end
-
-function action_check_core()
-	HTTP.prepare_content("application/json")
-	HTTP.write_json({
-		core_status = check_core();
-	})
-end
-
-function action_coreupdate()
-	HTTP.prepare_content("application/json")
-	HTTP.write_json({
-		coreup = coreup();
 	})
 end
 
@@ -2081,25 +1942,10 @@ end
 
 function action_backup()
 	local config = SYS.call("cp /etc/config/openclash /etc/openclash/openclash >/dev/null 2>&1")
-	local reader = ltn12_popen("exec tar -C '/etc/openclash/' -cz . 2>/dev/null")
+	local reader = ltn12_popen("exec tar -C '/etc/openclash/' -X '/usr/share/openclash/core-backup.exclude' -cz . 2>/dev/null")
 
 	HTTP.header(
 		'Content-Disposition', 'attachment; filename="Backup-OpenClash-%s-%s-%s.tar.gz"' %{
-			device_name, device_arh, os.date("%Y-%m-%d-%H-%M-%S")
-		})
-
-	HTTP.prepare_content("application/x-targz")
-	luci.ltn12.pump.all(reader, HTTP.write)
-	reader.kill()
-	SYS.call("rm -rf /etc/openclash/openclash >/dev/null 2>&1")
-end
-
-function action_backup_ex_core()
-	local config = SYS.call("cp /etc/config/openclash /etc/openclash/openclash >/dev/null 2>&1")
-	local reader = ltn12_popen("echo 'core' > /tmp/oc_exclude.txt && exec tar -C '/etc/openclash/' -X '/tmp/oc_exclude.txt' -cz . 2>/dev/null")
-
-	HTTP.header(
-		'Content-Disposition', 'attachment; filename="Backup-OpenClash-Exclude-Cores-%s-%s-%s.tar.gz"' %{
 			device_name, device_arh, os.date("%Y-%m-%d-%H-%M-%S")
 		})
 
@@ -2114,19 +1960,6 @@ function action_backup_only_config()
 
 	HTTP.header(
 		'Content-Disposition', 'attachment; filename="Backup-OpenClash-Config-%s-%s-%s.tar.gz"' %{
-			device_name, device_arh, os.date("%Y-%m-%d-%H-%M-%S")
-		})
-
-	HTTP.prepare_content("application/x-targz")
-	luci.ltn12.pump.all(reader, HTTP.write)
-	reader.kill()
-end
-
-function action_backup_only_core()
-	local reader = ltn12_popen("exec tar -C '/etc/openclash' -cz './core' 2>/dev/null")
-
-	HTTP.header(
-		'Content-Disposition', 'attachment; filename="Backup-OpenClash-Cores-%s-%s-%s.tar.gz"' %{
 			device_name, device_arh, os.date("%Y-%m-%d-%H-%M-%S")
 		})
 
@@ -5849,14 +5682,8 @@ local function fetch_oix_sub(token)
 			if sub_info[v] then
 				write_padded('{"stage":"downloading_config","text":"' .. luci.i18n.translate("Downloading config...") .. '"}')
 				SYS.exec(string.format('curl -sL -m 10 --retry 2 --user-agent "clash" "%s" -o "/etc/openclash/config/oixCloud - smart.yaml" >/dev/null 2>&1', sub_info[v]))
-				local core = coremetacv()
-				if core ~= "0" and not string.match(core, "oix") then
-					write_padded('{"stage":"downloading_core","text":"' .. luci.i18n.translate("Downloading core...") .. '"}')
-					SYS.exec("/usr/share/openclash/openclash_core.sh Oix")
-				else
-					write_padded('{"stage":"restarting","text":"' .. luci.i18n.translate("Restarting...") .. '"}')
-					SYS.call("/etc/init.d/openclash restart >/dev/null 2>&1 &")
-				end
+				write_padded('{"stage":"restarting","text":"' .. luci.i18n.translate("Restarting...") .. '"}')
+				SYS.call("/etc/init.d/openclash restart >/dev/null 2>&1 &")
 			end
 		end
 		return true

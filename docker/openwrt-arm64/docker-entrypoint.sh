@@ -25,6 +25,8 @@ fi
 
 # OpenWrt 不会自动使用 Docker 的 TZ 环境变量；显式设置为宿主测试环境的
 # Asia/Shanghai，保证 LuCI 中选择的订阅更新时间就是中国标准时间。
+[ -e /etc/config/system ] || touch /etc/config/system
+[ -n "$(uci -q get 'system.@system[0]')" ] || uci set system.system=system
 uci -q set 'system.@system[0].zonename=Asia/Shanghai'
 uci -q set 'system.@system[0].timezone=CST-8'
 uci -q commit system
@@ -50,6 +52,7 @@ docker_gateway=$(ip -4 route show default dev eth0 | awk 'NR == 1 { print $3 }')
   exit 1
 }
 
+[ -e /etc/config/network ] || touch /etc/config/network
 uci -q delete network.lan || true
 while uci -q get 'network.@device[0]' >/dev/null 2>&1; do
   uci -q delete 'network.@device[0]'

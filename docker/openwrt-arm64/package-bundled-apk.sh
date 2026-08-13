@@ -54,8 +54,9 @@ grep -q 'CONFIG_TARGET_ARCH_PACKAGES="aarch64_generic"' "$SDK_ROOT/.config" || {
 	exit 1
 }
 docker image inspect "$BUILDER_IMAGE" >/dev/null 2>&1 || {
-	echo "SDK builder image not found: $BUILDER_IMAGE" >&2
-	exit 1
+	docker build --platform linux/amd64 \
+		-f "$SCRIPT_DIR/Dockerfile.sdk-builder" \
+		-t "$BUILDER_IMAGE" "$SCRIPT_DIR"
 }
 
 OUTPUT_DIR=$REPO_ROOT/dist/openclash-arm64-x365-${X365_REVISION}
@@ -81,11 +82,14 @@ strings "$CORE_OUTPUT" | grep -q "$BUILD_ID"
 rsync -a --delete --exclude tools/codemirror/node_modules/ "$PACKAGE_SOURCE/" "$SDK_PACKAGE/"
 mkdir -p "$(dirname "$SDK_CORE")"
 install -m 0755 "$CORE_OUTPUT" "$SDK_CORE"
+install -m 0755 \
+	"$SDK_PACKAGE/tools/po2lmo/src/po2lmo" \
+	"$SDK_ROOT/staging_dir/host/bin/po2lmo"
 
 docker run --rm --platform linux/amd64 \
 	-v "$SDK_ROOT:/sdk" \
 	-w /sdk "$BUILDER_IMAGE" \
-	bash -lc 'make -C package/luci-app-openclash clean compile TOPDIR=/sdk V=sc -j1'
+	bash -lc 'PATH=/sdk/staging_dir/host/bin:$PATH make -C package/luci-app-openclash clean compile TOPDIR=/sdk V=sc -j1'
 
 SDK_APK=$SDK_ROOT/bin/packages/aarch64_generic/base/luci-app-openclash-${PACKAGE_VERSION}-r${PACKAGE_RELEASE}.apk
 OUTPUT_APK=$OUTPUT_DIR/luci-app-openclash-${BUILD_ID}-aarch64_generic.apk
@@ -107,11 +111,19 @@ docker run --rm --platform linux/amd64 \
 		grep -q '  name: luci-app-openclash' /tmp/metadata
 		grep -q '  version: ${PACKAGE_VERSION}-r${PACKAGE_RELEASE}' /tmp/metadata
 		grep -q '  arch: aarch64_generic' /tmp/metadata
+		grep -q 'PKG_UPGRADE:-0' /tmp/metadata
+		grep -q '/etc/openclash-upgrade-backup' /tmp/metadata
+		grep -q 'sha256sum openclash.uci openclash-data.tar.gz' /tmp/metadata
+		! grep -q '/tmp/openclash.bak' /tmp/metadata
 		\"\$APK_TOOL\" --allow-untrusted extract --destination /tmp/package \"\$APK\" >/dev/null
 		file /tmp/package/etc/openclash/core/clash_meta | grep -q 'ARM aarch64'
 		[ \"\$(stat -c %a /tmp/package/etc/openclash/core/clash_meta)\" = 755 ]
 		grep -q 'BUILD_ID=${BUILD_ID}' /tmp/package/usr/share/openclash/build-info
-		grep -q 'rm -f \"/tmp/openclash/core/clash_meta\"' /tmp/package/etc/uci-defaults/luci-openclash
+		test -x /tmp/package/usr/share/openclash/openclash_package_upgrade.sh
+		test ! -e /tmp/package/usr/share/openclash/openclash_core.sh
+		grep -q 'core-backup.exclude' /tmp/package/usr/share/openclash/openclash_package_upgrade.sh
+		test -s /tmp/package/usr/share/openclash/core-backup.exclude
+		grep -q 'openclash-package-upgrade-skip-start' /tmp/package/etc/init.d/openclash
 		strings /tmp/package/etc/openclash/core/clash_meta | grep -q '${BUILD_ID}'
 	"
 
