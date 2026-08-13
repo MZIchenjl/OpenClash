@@ -2,6 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openclash
 PKG_VERSION:=0.47.156
+PKG_RELEASE:=1
 PKG_MAINTAINER:=vernesong <https://github.com/vernesong/OpenClash>
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
@@ -41,7 +42,7 @@ define Package/$(PKG_NAME)
 	CATEGORY:=LuCI
 	SUBMENU:=3. Applications
 	TITLE:=LuCI support for clash
-	PKGARCH:=all
+	PKGARCH:=aarch64_generic
 	DEPENDS:=+dnsmasq-full +bash +curl +ca-bundle +ip-full \
 	+ruby +ruby-gems +ruby-base64 +ruby-json +ruby-openssl +ruby-uri +ruby-yaml +ruby-zlib \
 	+kmod-tun +unzip
@@ -49,15 +50,18 @@ define Package/$(PKG_NAME)
 endef
 
 define Package/$(PKG_NAME)/description
-    A LuCI support for clash
+    OpenClash 0.47.156 bundled with the pinned Mihomo core (x365-v1)
 endef
 
 define Build/Prepare
+	test -x $(CURDIR)/root/etc/openclash/core/clash_meta
+	$(TARGET_CROSS)readelf -h $(CURDIR)/root/etc/openclash/core/clash_meta | grep -q 'Machine:.*AArch64'
 	$(CP) $(CURDIR)/root $(PKG_BUILD_DIR)
 	$(CP) $(CURDIR)/luasrc $(PKG_BUILD_DIR)
 	$(foreach po,$(wildcard ${CURDIR}/po/zh-cn/*.po), \
 		po2lmo $(po) $(PKG_BUILD_DIR)/$(patsubst %.po,%.lmo,$(notdir $(po)));)
 	chmod 0755 $(PKG_BUILD_DIR)/root/etc/init.d/openclash
+	chmod 0755 $(PKG_BUILD_DIR)/root/etc/openclash/core/clash_meta
 	chmod -R 0755 $(PKG_BUILD_DIR)/root/usr/share/openclash/
 	exit 0
 endef

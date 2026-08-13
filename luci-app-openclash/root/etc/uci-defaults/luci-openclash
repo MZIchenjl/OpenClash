@@ -177,6 +177,9 @@ if [ -f "/tmp/openclash.bak" ]; then
 		fi
 	fi
 	mv -f "/tmp/openclash.bak" "/etc/config/openclash" >/dev/null 2>&1
+	# clash_meta is owned by this architecture-specific package. Do not let the
+	# pre-upgrade backup replace the core that was installed by the new APK.
+	rm -f "/tmp/openclash/core/clash_meta" >/dev/null 2>&1
 	cp -rf "/tmp/openclash/." "/etc/openclash/" >/dev/null 2>&1
 	#ui
 	if [ -d "/tmp/openclash_ui/" ]; then
