@@ -33,9 +33,11 @@ COPY container-overrides/02_sysinfo /lib/preinit/02_sysinfo
 COPY container-overrides/05_fw_defaults /etc/board.d/05_fw_defaults
 
 RUN mkdir -p /etc/openclash/core \
- && cp /usr/libexec/mihomo-linux-arm64 /etc/openclash/core/clash_meta \
+ && mkdir -p /usr/libexec/openclash \
+ && cp /usr/libexec/mihomo-linux-arm64 /usr/libexec/openclash/clash_meta \
+ && cp /usr/libexec/openclash/clash_meta /etc/openclash/core/clash_meta \
  && rm -f /usr/share/openclash/openclash_core.sh /usr/lib/lua/luci/view/openclash/update.htm \
- && chmod 0755 /etc/init.d/openclash /etc/openclash/core/clash_meta /usr/libexec/mihomo-linux-arm64 \
+ && chmod 0755 /etc/init.d/openclash /etc/openclash/core/clash_meta /usr/libexec/openclash/clash_meta /usr/libexec/mihomo-linux-arm64 \
  && chmod 0644 /usr/libexec/openclash-defaults/* \
  && chmod 0755 /usr/libexec/openclash-docker-entrypoint \
  && chmod 0644 /etc/board.json \

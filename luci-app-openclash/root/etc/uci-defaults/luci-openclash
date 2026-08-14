@@ -1,6 +1,19 @@
 #!/bin/bash
 . /lib/functions.sh
 . /usr/share/openclash/uci.sh
+. /usr/share/openclash/openclash_upgrade_log.sh
+
+OPENCLASH_UPGRADE_TARGET="$(awk -F= '$1 == "BUILD_ID" { print $2; exit }' /usr/share/openclash/build-info 2>/dev/null)"
+[ -n "$OPENCLASH_UPGRADE_TARGET" ] || OPENCLASH_UPGRADE_TARGET=unknown
+OPENCLASH_UPGRADE_STAGE=initialize
+openclash_upgrade_exit() {
+	OPENCLASH_UPGRADE_EXIT_STATUS=$?
+	if [ "$OPENCLASH_UPGRADE_EXIT_STATUS" -ne 0 ]; then
+		openclash_upgrade_error "phase=uci-default result=failed stage=$OPENCLASH_UPGRADE_STAGE exit=$OPENCLASH_UPGRADE_EXIT_STATUS target=$OPENCLASH_UPGRADE_TARGET"
+	fi
+}
+trap openclash_upgrade_exit EXIT
+openclash_upgrade_log "phase=uci-default event=start target=$OPENCLASH_UPGRADE_TARGET"
 
 OPENCLASH_UPGRADE_RESTORED=0
 OPENCLASH_UPGRADE_WAS_RUNNING=0
@@ -168,11 +181,13 @@ cp -f "/etc/openclash/rule_provider/oc-cn-domain.mrs" "/usr/share/openclash/back
 # backup is used for upgrades from this package; /tmp is supported for the first
 # upgrade from the upstream package.
 if [ -f "/etc/openclash-upgrade-backup/backup-complete" ] || [ -f "/etc/openclash-upgrade-backup.previous/backup-complete" ] || [ -f "/tmp/openclash.bak" ]; then
+	OPENCLASH_UPGRADE_STAGE=configuration-restore
 	if ! /usr/share/openclash/openclash_package_upgrade.sh restore; then
-		logger -t openclash-upgrade "Configuration restore failed; backup retained"
+		openclash_upgrade_error "phase=uci-default result=failed stage=configuration-restore exit=1 backup=retained"
 		exit 1
 	fi
 	OPENCLASH_UPGRADE_RESTORED=1
+	openclash_upgrade_log "phase=uci-default result=ok stage=configuration-restore"
 	#ui
 	if [ -d "/tmp/openclash_ui/" ]; then
 		if [ -d "/tmp/openclash_ui/metacubexd/" ] || [ -d "/tmp/openclash_ui/zashboard/" ] || [ -d "/tmp/openclash_ui/yacd/" ] || [ -d "/tmp/openclash_ui/dashboard/" ]; then
@@ -267,21 +282,50 @@ sed -i '/.*kB maximum content size*/c\export let HTTP_MAX_CONTENT = 1024*10240;	
 
 /etc/init.d/uhttpd restart >/dev/null 2>&1
 
+# APK protects files below /etc and may retain a locally modified core. Keep the
+# package-owned binary under /usr and atomically refresh the runtime copy before
+# OpenClash is restarted.
+BUNDLED_CORE="/usr/libexec/openclash/clash_meta"
+RUNTIME_CORE="/etc/openclash/core/clash_meta"
+OPENCLASH_UPGRADE_STAGE=core-presence
+[ -x "$BUNDLED_CORE" ] || {
+	openclash_upgrade_error "phase=uci-default result=failed stage=core-presence exit=1 reason=bundled-core-missing"
+	exit 1
+}
+OPENCLASH_UPGRADE_STAGE=core-directory
+mkdir -p "/etc/openclash/core" || exit 1
+OPENCLASH_UPGRADE_STAGE=core-copy
+cp -f "$BUNDLED_CORE" "${RUNTIME_CORE}.new" || exit 1
+OPENCLASH_UPGRADE_STAGE=core-mode
+chmod 0755 "${RUNTIME_CORE}.new" || exit 1
+OPENCLASH_UPGRADE_STAGE=core-activate
+mv -f "${RUNTIME_CORE}.new" "$RUNTIME_CORE" || exit 1
+OPENCLASH_UPGRADE_STAGE=core-verify
+cmp -s "$BUNDLED_CORE" "$RUNTIME_CORE" || exit 1
+openclash_upgrade_log "phase=uci-default result=ok stage=core-verify"
+
 if [ "$OPENCLASH_UPGRADE_RESTORED" = "1" ]; then
 	if [ "$OPENCLASH_UPGRADE_WAS_RUNNING" = "1" ]; then
+		OPENCLASH_UPGRADE_STAGE=service-restart
 		if ! /etc/init.d/openclash restart >/dev/null 2>&1; then
-			logger -t openclash-upgrade "OpenClash restart failed; upgrade backup retained"
+			openclash_upgrade_error "phase=uci-default result=failed stage=service-restart exit=1 backup=retained"
 			touch /etc/openclash-upgrade-backup/restart-required 2>/dev/null
 			exit 1
 		fi
+		openclash_upgrade_log "phase=uci-default result=ok stage=service-restart"
 	else
 		# default_postinst calls every packaged init script. Consume this marker in
 		# start_service so a manually stopped instance remains stopped.
 		touch /tmp/openclash-package-upgrade-skip-start
+		openclash_upgrade_log "phase=uci-default result=ok stage=service-state action=remain-stopped"
 	fi
+	OPENCLASH_UPGRADE_STAGE=backup-cleanup
 	/usr/share/openclash/openclash_package_upgrade.sh cleanup
 fi
 
 rm -rf /tmp/luci-indexcache /tmp/luci-indexcache.* /var/luci-indexcache /var/luci-indexcache.* >/dev/null 2>&1
 rm -rf /tmp/luci-modulecache /var/luci-modulecache >/dev/null 2>&1
+OPENCLASH_UPGRADE_STAGE=complete
+openclash_upgrade_log "phase=uci-default result=ok stage=complete target=$OPENCLASH_UPGRADE_TARGET restored=$OPENCLASH_UPGRADE_RESTORED was_running=$OPENCLASH_UPGRADE_WAS_RUNNING"
+trap - EXIT
 exit 0

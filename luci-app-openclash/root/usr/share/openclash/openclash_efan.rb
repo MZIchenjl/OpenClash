@@ -19,10 +19,6 @@ module OpenClashEfan
   CONFIG_DIR = File.join(ROOT, "config")
   CURL_BIN = ENV.fetch("OPENCLASH_EFAN_CURL", "curl")
   MAX_RESPONSE_BYTES = 16 * 1024 * 1024
-  # OpenClash's nftables and iptables output chains reserve GID 65534 for
-  # traffic that must not be transparently redirected back into Mihomo. Use
-  # that same documented-by-implementation bypass for API control traffic.
-  OPENCLASH_BYPASS_GID = 65_534
   PRIVATE_KEY_MASK = "encoding".b
   PRIVATE_KEY_BLOB = Base64.decode64(<<~B64).freeze
     SENOQkkrKyAsIEM9NyhONzcnNS4wLE4sIDdOQklEQ20oJyoqFDgnJSQvKCwlOCsmHDgpFjIzOSRK
@@ -236,8 +232,7 @@ module OpenClashEfan
       "--config",
       config_file,
       out: write_pipe,
-      err: error_io,
-      gid: OPENCLASH_BYPASS_GID
+      err: error_io
     )
     write_pipe.close
     status_text = read_pipe.read

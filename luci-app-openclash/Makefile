@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openclash
 PKG_VERSION:=0.47.156
-PKG_RELEASE:=1
+PKG_RELEASE:=3
 PKG_MAINTAINER:=vernesong <https://github.com/vernesong/OpenClash>
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
@@ -50,18 +50,18 @@ define Package/$(PKG_NAME)
 endef
 
 define Package/$(PKG_NAME)/description
-    OpenClash 0.47.156 bundled with the pinned Mihomo core (x365-v1)
+    OpenClash 0.47.156 bundled with the pinned Mihomo core (x365-v3)
 endef
 
 define Build/Prepare
-	test -x $(CURDIR)/root/etc/openclash/core/clash_meta
-	$(TARGET_CROSS)readelf -h $(CURDIR)/root/etc/openclash/core/clash_meta | grep -q 'Machine:.*AArch64'
+	test -x $(CURDIR)/root/usr/libexec/openclash/clash_meta
+	$(TARGET_CROSS)readelf -h $(CURDIR)/root/usr/libexec/openclash/clash_meta | grep -q 'Machine:.*AArch64'
 	$(CP) $(CURDIR)/root $(PKG_BUILD_DIR)
 	$(CP) $(CURDIR)/luasrc $(PKG_BUILD_DIR)
 	$(foreach po,$(wildcard ${CURDIR}/po/zh-cn/*.po), \
 		po2lmo $(po) $(PKG_BUILD_DIR)/$(patsubst %.po,%.lmo,$(notdir $(po)));)
 	chmod 0755 $(PKG_BUILD_DIR)/root/etc/init.d/openclash
-	chmod 0755 $(PKG_BUILD_DIR)/root/etc/openclash/core/clash_meta
+	chmod 0755 $(PKG_BUILD_DIR)/root/usr/libexec/openclash/clash_meta
 	chmod 0755 $(PKG_BUILD_DIR)/root/usr/share/openclash/openclash_package_upgrade.sh
 	chmod -R 0755 $(PKG_BUILD_DIR)/root/usr/share/openclash/
 	exit 0
@@ -79,9 +79,25 @@ endef
 
 define Package/$(PKG_NAME)/preinst
 #!/bin/sh
+	UPGRADE_LOG="/etc/openclash-upgrade.log"
+	preinst_log() {
+		PREINST_MESSAGE="$$*"
+		printf '%s %s\n' "$$(date '+%Y-%m-%dT%H:%M:%S%z' 2>/dev/null || date)" "$${PREINST_MESSAGE}" >> "$${UPGRADE_LOG}" 2>/dev/null || true
+		chmod 0600 "$${UPGRADE_LOG}" 2>/dev/null || true
+		logger -t openclash-upgrade "$${PREINST_MESSAGE}" 2>/dev/null || true
+	}
+	preinst_fail() {
+		preinst_log "phase=preinst result=failed stage=$$1 exit=1 target=$(PKG_VERSION)-r$(PKG_RELEASE)"
+		printf 'openclash-upgrade: preinst failed at %s\n' "$$1" >&2
+		exit 1
+	}
+	preinst_log "phase=preinst event=start upgrade=$${PKG_UPGRADE:-0} target=$(PKG_VERSION)-r$(PKG_RELEASE)"
 	[ "$${PKG_UPGRADE:-0}" = "1" ] || exit 0
 	if [ -x "/usr/share/openclash/openclash_package_upgrade.sh" ]; then
-		/usr/share/openclash/openclash_package_upgrade.sh backup || exit 1
+		if ! /usr/share/openclash/openclash_package_upgrade.sh backup; then
+			preinst_fail helper-backup
+		fi
+		preinst_log "phase=preinst result=ok stage=helper-backup target=$(PKG_VERSION)-r$(PKG_RELEASE)"
 		exit 0
 	fi
 
@@ -91,41 +107,46 @@ define Package/$(PKG_NAME)/preinst
 	BACKUP_DIR="/etc/openclash-upgrade-backup"
 	STAGING_DIR="$${BACKUP_DIR}.new"
 	PREVIOUS_DIR="$${BACKUP_DIR}.previous"
-	[ -f "/etc/config/openclash" ] || exit 1
-	rm -rf "$${STAGING_DIR}" || exit 1
-	mkdir -p "$${STAGING_DIR}" || exit 1
-	cp -p "/etc/config/openclash" "$${STAGING_DIR}/openclash.uci" || exit 1
-	printf '%s\n' './core' './core/*' 'core' 'core/*' > "$${STAGING_DIR}/core.exclude" || exit 1
+	[ -f "/etc/config/openclash" ] || preinst_fail config-check
+	rm -rf "$${STAGING_DIR}" || preinst_fail staging-cleanup
+	mkdir -p "$${STAGING_DIR}" || preinst_fail staging-create
+	cp -p "/etc/config/openclash" "$${STAGING_DIR}/openclash.uci" || preinst_fail config-copy
+	printf '%s\n' './core' './core/*' 'core' 'core/*' > "$${STAGING_DIR}/core.exclude" || preinst_fail core-exclude-create
 	if [ -d "/etc/openclash" ]; then
-		tar -C "/etc/openclash" -X "$${STAGING_DIR}/core.exclude" -czf "$${STAGING_DIR}/openclash-data.tar.gz" . || exit 1
+		tar -C "/etc/openclash" -X "$${STAGING_DIR}/core.exclude" -czf "$${STAGING_DIR}/openclash-data.tar.gz" . || preinst_fail data-archive
 	else
-		tar -czf "$${STAGING_DIR}/openclash-data.tar.gz" -T /dev/null || exit 1
+		tar -czf "$${STAGING_DIR}/openclash-data.tar.gz" -T /dev/null || preinst_fail empty-archive
 	fi
 	if tar -tzf "$${STAGING_DIR}/openclash-data.tar.gz" | grep -q '^\./core\(/\|$$\)'; then
-		exit 1
+		preinst_fail core-exclusion
 	fi
 	(
 		cd "$${STAGING_DIR}" || exit 1
 		sha256sum openclash.uci openclash-data.tar.gz > checksums
-	) || exit 1
+	) || preinst_fail checksum-create
 	if pidof clash >/dev/null 2>&1; then
-		echo 1 > "$${STAGING_DIR}/was-running" || exit 1
+		echo 1 > "$${STAGING_DIR}/was-running" || preinst_fail running-marker
 	else
-		echo 0 > "$${STAGING_DIR}/was-running" || exit 1
+		echo 0 > "$${STAGING_DIR}/was-running" || preinst_fail running-marker
 	fi
-	touch "$${STAGING_DIR}/backup-complete" || exit 1
-	rm -rf "$${PREVIOUS_DIR}" || exit 1
-	[ ! -e "$${BACKUP_DIR}" ] || mv "$${BACKUP_DIR}" "$${PREVIOUS_DIR}" || exit 1
+	touch "$${STAGING_DIR}/backup-complete" || preinst_fail completion-marker
+	rm -rf "$${PREVIOUS_DIR}" || preinst_fail previous-cleanup
+	[ ! -e "$${BACKUP_DIR}" ] || mv "$${BACKUP_DIR}" "$${PREVIOUS_DIR}" || preinst_fail previous-rotate
 	if ! mv "$${STAGING_DIR}" "$${BACKUP_DIR}"; then
 		[ -e "$${BACKUP_DIR}" ] || [ ! -e "$${PREVIOUS_DIR}" ] || mv "$${PREVIOUS_DIR}" "$${BACKUP_DIR}"
-		exit 1
+		preinst_fail backup-activate
 	fi
-	rm -rf "$${PREVIOUS_DIR}" || exit 1
+	rm -rf "$${PREVIOUS_DIR}" || preinst_fail previous-finalize
+	preinst_log "phase=preinst result=ok stage=inline-backup target=$(PKG_VERSION)-r$(PKG_RELEASE)"
 	exit 0
 endef
 
 define Package/$(PKG_NAME)/postinst
 #!/bin/sh
+	if [ -r "/usr/share/openclash/openclash_upgrade_log.sh" ]; then
+		. /usr/share/openclash/openclash_upgrade_log.sh
+		openclash_upgrade_log "phase=postinst result=ok upgrade=$${PKG_UPGRADE:-0} target=$(PKG_VERSION)-r$(PKG_RELEASE)"
+	fi
 	exit 0
 endef
 

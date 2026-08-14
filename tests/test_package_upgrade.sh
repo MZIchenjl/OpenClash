@@ -11,6 +11,7 @@ CONFIG_FILE="$TEST_ROOT/etc/config/openclash"
 DATA_DIR="$TEST_ROOT/etc/openclash"
 BACKUP_DIR="$TEST_ROOT/etc/openclash-upgrade-backup"
 LEGACY_DIR="$TEST_ROOT/tmp"
+UPGRADE_LOG="$TEST_ROOT/etc/openclash-upgrade.log"
 
 mkdir -p "$(dirname "$CONFIG_FILE")" "$DATA_DIR/core" "$DATA_DIR/config" "$DATA_DIR/custom" "$DATA_DIR/history" "$LEGACY_DIR"
 printf '%s\n' 'config openclash preserved' > "$CONFIG_FILE"
@@ -25,12 +26,15 @@ run_helper() {
 	OPENCLASH_UPGRADE_DATA_DIR="$DATA_DIR" \
 	OPENCLASH_UPGRADE_LEGACY_DIR="$LEGACY_DIR" \
 	OPENCLASH_UPGRADE_CORE_EXCLUDE_FILE="$CORE_EXCLUDE_FILE" \
+	OPENCLASH_UPGRADE_LOG_FILE="$UPGRADE_LOG" \
 	OPENCLASH_UPGRADE_TEST_RUNNING=1 \
 		sh "$HELPER" "$1"
 }
 
 run_helper backup
 [ -f "$BACKUP_DIR/backup-complete" ]
+[ -s "$UPGRADE_LOG" ]
+grep -q 'phase=backup result=ok running=1' "$UPGRADE_LOG"
 [ "$(cat "$BACKUP_DIR/was-running")" = 1 ]
 if tar -tzf "$BACKUP_DIR/openclash-data.tar.gz" | grep -q '^\./core\(/\|$\)'; then
 	echo "package upgrade backup contains the core" >&2
@@ -64,8 +68,14 @@ if run_helper restore; then
 	exit 1
 fi
 [ -f "$BACKUP_DIR/backup-complete" ]
+grep -q 'phase=restore result=failed stage=checksum-verify exit=1' "$UPGRADE_LOG"
+if grep -q 'config openclash preserved' "$UPGRADE_LOG"; then
+	echo "package upgrade log contains configuration content" >&2
+	exit 1
+fi
 
 run_helper cleanup
 [ ! -e "$BACKUP_DIR" ]
+grep -q 'phase=cleanup result=ok' "$UPGRADE_LOG"
 
 echo "package upgrade configuration checks passed"

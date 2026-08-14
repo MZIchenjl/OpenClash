@@ -4,7 +4,7 @@ set -eu
 # /etc/openclash 是持久卷。每次启动都用镜像内本次构建的 ARM64 核心更新它，
 # 避免重建镜像后仍然误用卷中遗留的旧 Mihomo。
 mkdir -p /etc/openclash/core
-cp -f /usr/libexec/mihomo-linux-arm64 /etc/openclash/core/clash_meta
+cp -f /usr/libexec/openclash/clash_meta /etc/openclash/core/clash_meta
 chmod 0755 /etc/openclash/core/clash_meta
 
 # 老的命名卷可能建立于这些基础数据加入镜像之前。仅在文件缺失时补齐，

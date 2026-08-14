@@ -76,6 +76,7 @@ compose exec -T openwrt sh -c '
   test ! -e /usr/share/openclash/openclash_core.sh
   ! grep -q "value=\"clash_meta\"" /usr/lib/lua/luci/view/openclash/upload.htm
   ! grep -qE "core_download|remove_all_core|backup_only_core|backup_ex_core" /usr/lib/lua/luci/controller/openclash.lua
+  cmp -s /usr/libexec/openclash/clash_meta /etc/openclash/core/clash_meta
 '
 
 echo '[6/9] Mihomo ARM64 与 x365 配置解析'
@@ -121,6 +122,10 @@ if grep -Fq 'Efan Account' "$luci_page"; then
   echo 'Efan 页面仍含未翻译的标题。' >&2
   exit 1
 fi
+version_json=$(curl --max-time 20 -sS -c "$luci_cookie" -b "$luci_cookie" \
+  "http://127.0.0.1:$LUCI_HTTP_PORT/cgi-bin/luci/admin/services/openclash/update")
+printf '%s' "$version_json" | grep -Fq '0.47.156-x365-v3'
+printf '%s' "$version_json" | grep -Fq 'alpha-g4e13ff26-x365-v3'
 cleanup_luci_test
 trap - EXIT HUP INT TERM
 

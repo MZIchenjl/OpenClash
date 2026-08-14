@@ -20,6 +20,8 @@ PACKAGE_RELEASE=$(sed -n 's/^PKG_RELEASE:=//p' "$PACKAGE_SOURCE/Makefile" | head
 PINNED_COMMIT=$(git -C "$REPO_ROOT" ls-tree HEAD mihomo | awk '{print $3}')
 CHECKED_OUT_COMMIT=$(git -C "$REPO_ROOT/mihomo" rev-parse HEAD)
 EXPECTED_BUILD_ID="${PACKAGE_VERSION}-alpha-g$(printf '%s' "$PINNED_COMMIT" | cut -c1-8)-x365-${X365_REVISION}"
+EXPECTED_OPENCLASH_BUILD_ID="${PACKAGE_VERSION}-x365-${X365_REVISION}"
+EXPECTED_MIHOMO_BUILD_ID="alpha-g$(printf '%s' "$PINNED_COMMIT" | cut -c1-8)-x365-${X365_REVISION}"
 
 [ "$PACKAGE_VERSION" = "$OPENCLASH_VERSION" ] || {
 	echo "OpenClash version does not match build-info." >&2
@@ -39,6 +41,14 @@ EXPECTED_BUILD_ID="${PACKAGE_VERSION}-alpha-g$(printf '%s' "$PINNED_COMMIT" | cu
 }
 [ "$BUILD_ID" = "$EXPECTED_BUILD_ID" ] || {
 	echo "BUILD_ID should be $EXPECTED_BUILD_ID" >&2
+	exit 1
+}
+[ "$OPENCLASH_BUILD_ID" = "$EXPECTED_OPENCLASH_BUILD_ID" ] || {
+	echo "OPENCLASH_BUILD_ID should be $EXPECTED_OPENCLASH_BUILD_ID" >&2
+	exit 1
+}
+[ "$MIHOMO_BUILD_ID" = "$EXPECTED_MIHOMO_BUILD_ID" ] || {
+	echo "MIHOMO_BUILD_ID should be $EXPECTED_MIHOMO_BUILD_ID" >&2
 	exit 1
 }
 [ "$X365_REVISION" = "v$PACKAGE_RELEASE" ] || {
@@ -62,7 +72,7 @@ docker image inspect "$BUILDER_IMAGE" >/dev/null 2>&1 || {
 OUTPUT_DIR=$REPO_ROOT/dist/openclash-arm64-x365-${X365_REVISION}
 CORE_OUTPUT=$OUTPUT_DIR/clash_meta
 SDK_PACKAGE=$SDK_ROOT/package/luci-app-openclash
-SDK_CORE=$SDK_PACKAGE/root/etc/openclash/core/clash_meta
+SDK_CORE=$SDK_PACKAGE/root/usr/libexec/openclash/clash_meta
 
 mkdir -p "$OUTPUT_DIR" "$SDK_PACKAGE" "$(dirname "$SDK_CORE")"
 
@@ -72,12 +82,12 @@ BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build \
 		-tags with_gvisor \
 		-trimpath \
-		-ldflags "-X 'github.com/metacubex/mihomo/constant.Version=$BUILD_ID' -X 'github.com/metacubex/mihomo/constant.BuildTime=$BUILD_TIME' -w -s -buildid=" \
+		-ldflags "-X 'github.com/metacubex/mihomo/constant.Version=$MIHOMO_BUILD_ID' -X 'github.com/metacubex/mihomo/constant.BuildTime=$BUILD_TIME' -w -s -buildid=" \
 		-o "$CORE_OUTPUT" .
 )
 chmod 0755 "$CORE_OUTPUT"
 file "$CORE_OUTPUT" | grep -q 'ARM aarch64'
-strings "$CORE_OUTPUT" | grep -q "$BUILD_ID"
+strings "$CORE_OUTPUT" | grep -q "$MIHOMO_BUILD_ID"
 
 rsync -a --delete --exclude tools/codemirror/node_modules/ "$PACKAGE_SOURCE/" "$SDK_PACKAGE/"
 mkdir -p "$(dirname "$SDK_CORE")"
@@ -113,18 +123,24 @@ docker run --rm --platform linux/amd64 \
 		grep -q '  arch: aarch64_generic' /tmp/metadata
 		grep -q 'PKG_UPGRADE:-0' /tmp/metadata
 		grep -q '/etc/openclash-upgrade-backup' /tmp/metadata
+		grep -q '/etc/openclash-upgrade.log' /tmp/metadata
 		grep -q 'sha256sum openclash.uci openclash-data.tar.gz' /tmp/metadata
 		! grep -q '/tmp/openclash.bak' /tmp/metadata
 		\"\$APK_TOOL\" --allow-untrusted extract --destination /tmp/package \"\$APK\" >/dev/null
-		file /tmp/package/etc/openclash/core/clash_meta | grep -q 'ARM aarch64'
-		[ \"\$(stat -c %a /tmp/package/etc/openclash/core/clash_meta)\" = 755 ]
+		file /tmp/package/usr/libexec/openclash/clash_meta | grep -q 'ARM aarch64'
+		[ \"\$(stat -c %a /tmp/package/usr/libexec/openclash/clash_meta)\" = 755 ]
+		test ! -e /tmp/package/etc/openclash/core/clash_meta
 		grep -q 'BUILD_ID=${BUILD_ID}' /tmp/package/usr/share/openclash/build-info
 		test -x /tmp/package/usr/share/openclash/openclash_package_upgrade.sh
+		test -x /tmp/package/usr/share/openclash/openclash_upgrade_log.sh
 		test ! -e /tmp/package/usr/share/openclash/openclash_core.sh
 		grep -q 'core-backup.exclude' /tmp/package/usr/share/openclash/openclash_package_upgrade.sh
+		grep -q 'phase=backup result=ok' /tmp/package/usr/share/openclash/openclash_package_upgrade.sh
 		test -s /tmp/package/usr/share/openclash/core-backup.exclude
 		grep -q 'openclash-package-upgrade-skip-start' /tmp/package/etc/init.d/openclash
-		strings /tmp/package/etc/openclash/core/clash_meta | grep -q '${BUILD_ID}'
+		grep -q 'OPENCLASH_BUILD_ID=${OPENCLASH_BUILD_ID}' /tmp/package/usr/share/openclash/build-info
+		grep -q 'MIHOMO_BUILD_ID=${MIHOMO_BUILD_ID}' /tmp/package/usr/share/openclash/build-info
+		strings /tmp/package/usr/libexec/openclash/clash_meta | grep -q '${MIHOMO_BUILD_ID}'
 	"
 
 echo "APK: $OUTPUT_APK"

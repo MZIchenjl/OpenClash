@@ -15,6 +15,7 @@ UPDATE_VIEW="$ROOT_DIR/luci-app-openclash/luasrc/view/openclash/update.htm"
 SUBMODULES="$ROOT_DIR/.gitmodules"
 CORE_WORKFLOW="$ROOT_DIR/.github/workflows/compile_meta_core.yml"
 MAKEFILE="$ROOT_DIR/luci-app-openclash/Makefile"
+BUILD_INFO="$ROOT_DIR/luci-app-openclash/root/usr/share/openclash/build-info"
 
 if grep -q 'tab("version_update"' "$SETTINGS"; then
   echo "online update tab is still registered" >&2
@@ -45,6 +46,16 @@ grep -q 'openclash-package-upgrade-skip-start' "$INIT"
 grep -q '/etc/openclash-upgrade-backup' "$MAKEFILE"
 grep -q 'backup-complete' "$MAKEFILE"
 grep -q 'PKG_UPGRADE:-0' "$MAKEFILE"
+grep -q 'root/usr/libexec/openclash/clash_meta' "$MAKEFILE"
+grep -q 'OPENCLASH_BUILD_ID=0.47.156-x365-v3' "$BUILD_INFO"
+grep -q 'MIHOMO_BUILD_ID=alpha-g4e13ff26-x365-v3' "$BUILD_INFO"
+grep -q 'local meta_core_path="/etc/openclash/core/clash_meta"' "$CONTROLLER"
+grep -q 'OPENCLASH_BUILD_ID=' "$CONTROLLER"
+grep -q 'logger -t openclash-efan' "$CONTROLLER"
+grep -q '\[Efan\].*summary' "$CONTROLLER"
+grep -q '>> /tmp/openclash.log' "$CONTROLLER"
+! grep -q 'openclash-upgrade.log.*\[Efan\]' "$CONTROLLER"
+grep -q 'BUNDLED_CORE="/usr/libexec/openclash/clash_meta"' "$UCI_DEFAULTS"
 if grep -q 'cp -f "/etc/config/openclash" "/tmp/openclash.bak"' "$MAKEFILE"; then
   echo "package upgrade still relies on a volatile /tmp configuration backup" >&2
   exit 1

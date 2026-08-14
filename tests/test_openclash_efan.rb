@@ -14,6 +14,11 @@ ENV["OPENCLASH_EFAN_SKIP_MIHOMO_VALIDATE"] = "1"
 load File.expand_path("../luci-app-openclash/root/usr/share/openclash/openclash_efan.rb", __dir__)
 
 class OpenClashEfanTest < Minitest::Test
+  def test_api_requests_do_not_bypass_fake_ip_interception
+    source = File.binread(File.expand_path("../luci-app-openclash/root/usr/share/openclash/openclash_efan.rb", __dir__))
+    refute_match(/OPENCLASH_BYPASS_GID|gid:\s*65_?534/, source)
+  end
+
   TEST_UUID = "00112233-4455-6677-8899-aabbccddeeff"
   TEST_PBK = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
   TEST_SID = "0123456789abcdef"

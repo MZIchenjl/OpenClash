@@ -125,12 +125,7 @@ else
 	opkg = nil
 end
 
-local core_path_mode = fs.uci_get_config("config", "small_flash_memory")
-if core_path_mode ~= "1" then
-	meta_core_path="/etc/openclash/core/clash_meta"
-else
-	meta_core_path="/tmp/etc/openclash/core/clash_meta"
-end
+local meta_core_path="/etc/openclash/core/clash_meta"
 
 local function is_running()
 	return SYS.call("pidof clash >/dev/null") == 0
@@ -274,6 +269,11 @@ local function corever()
 end
 
 local function opcv()
+	local build_info = fs.readfile("/usr/share/openclash/build-info") or ""
+	local bundled_version = build_info:match("OPENCLASH_BUILD_ID=([^\r\n]+)")
+	if bundled_version and bundled_version:match("^[%w%.%-]+$") then
+		return bundled_version
+	end
 	local v
 	local info = opkg and opkg.info("luci-app-openclash")
 	if info and info["luci-app-openclash"] and info["luci-app-openclash"]["Version"] and info["luci-app-openclash"]["Installed-Time"] then
@@ -5515,6 +5515,22 @@ local function efan_write_login_request(email, password)
 	return path
 end
 
+local function efan_log_result(operation, result)
+	local function safe_field(value)
+		return tostring(value or "-"):gsub("[^%w%._:%-]", "_"):sub(1, 64)
+	end
+	local summary = string.format(
+		"operation=%s status=%s error=%s session=%s fetch=%s services=%s ready=%s failed=%s auth_invalid=%s",
+		safe_field(operation), safe_field(result.status), safe_field(result.error),
+		safe_field(result.session_state), safe_field(result.fetch_state),
+		safe_field(result.service_count), safe_field(result.ready_count),
+		safe_field(result.failed_count), safe_field(result.auth_invalid_count)
+	)
+	SYS.call("logger -t openclash-efan " .. UTIL.shellquote(summary))
+	local runtime_log = os.date("%Y-%m-%d %H:%M:%S") .. " [Info] [Efan] " .. summary
+	SYS.call("printf '%s\\n' " .. UTIL.shellquote(runtime_log) .. " >> /tmp/openclash.log")
+end
+
 function efan_login()
 	local email = (HTTP.formvalue("email") or ""):gsub("^%s+", ""):gsub("%s+$", "")
 	local password = HTTP.formvalue("password") or ""
@@ -5533,14 +5549,17 @@ function efan_login()
 			nixio.fs.unlink(request_path)
 		end
 	end
+	efan_log_result("login", result)
 	HTTP.prepare_content("application/json")
 	HTTP.write_json(result)
 end
 
 function efan_refresh()
 	local email = HTTP.formvalue("email") or ""
+	local result = run_efan_client("refresh", email)
+	efan_log_result("refresh", result)
 	HTTP.prepare_content("application/json")
-	HTTP.write_json(run_efan_client("refresh", email))
+	HTTP.write_json(result)
 end
 
 function efan_status()
@@ -5551,8 +5570,10 @@ end
 
 function efan_logout()
 	local email = HTTP.formvalue("email") or ""
+	local result = run_efan_client("logout", email)
+	efan_log_result("logout", result)
 	HTTP.prepare_content("application/json")
-	HTTP.write_json(run_efan_client("logout", email))
+	HTTP.write_json(result)
 end
 
 function oix_login_info_save()
