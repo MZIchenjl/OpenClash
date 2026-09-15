@@ -124,8 +124,8 @@ if grep -Fq 'Efan Account' "$luci_page"; then
 fi
 version_json=$(curl --max-time 20 -sS -c "$luci_cookie" -b "$luci_cookie" \
   "http://127.0.0.1:$LUCI_HTTP_PORT/cgi-bin/luci/admin/services/openclash/update")
-printf '%s' "$version_json" | grep -Fq '0.47.156-x365-v3'
-printf '%s' "$version_json" | grep -Fq 'alpha-g4e13ff26-x365-v3'
+printf '%s' "$version_json" | grep -Fq '0.47.156-x365-v4'
+printf '%s' "$version_json" | grep -Fq 'alpha-g80140d20-x365-v4'
 cleanup_luci_test
 trap - EXIT HUP INT TERM
 

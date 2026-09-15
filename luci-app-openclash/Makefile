@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openclash
 PKG_VERSION:=0.47.156
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 PKG_MAINTAINER:=vernesong <https://github.com/vernesong/OpenClash>
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
@@ -50,7 +50,7 @@ define Package/$(PKG_NAME)
 endef
 
 define Package/$(PKG_NAME)/description
-    OpenClash 0.47.156 bundled with the pinned Mihomo core (x365-v3)
+    OpenClash 0.47.156 bundled with the pinned Mihomo core (x365-v4)
 endef
 
 define Build/Prepare

@@ -38,9 +38,9 @@ The build stops unless the checked-out Mihomo source exactly matches the gitlink
 by OpenClash. It also rejects dirty Mihomo sources and non-AArch64 binaries.
 
 The human-readable build identifier combines both upstream versions and the local package
-revision, for example `0.47.156-alpha-g4e13ff26-x365-v3`. The LuCI home page displays
-`0.47.156-x365-v3` for OpenClash and `alpha-g4e13ff26-x365-v3` for Mihomo. APK metadata retains the valid
-and upgrade-safe form `0.47.156-r1`. For another x365 packaging revision, increment both
+revision, for example `0.47.156-alpha-g80140d20-x365-v4`. The LuCI home page displays
+`0.47.156-x365-v4` for OpenClash and `alpha-g80140d20-x365-v4` for Mihomo. APK metadata retains the valid
+and upgrade-safe form `0.47.156-r4`. For another x365 packaging revision, increment both
 `X365_REVISION` and `PKG_RELEASE`. When OpenClash advances, update `PKG_VERSION`, reset the
 release to `1`, and refresh `build-info`.
 
