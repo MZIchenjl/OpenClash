@@ -1,7 +1,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openclash
-PKG_VERSION:=0.47.164
+PKG_VERSION:=0.47.156
+PKG_RELEASE:=4
 PKG_MAINTAINER:=vernesong <https://github.com/vernesong/OpenClash>
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
@@ -41,22 +42,27 @@ define Package/$(PKG_NAME)
 	CATEGORY:=LuCI
 	SUBMENU:=3. Applications
 	TITLE:=LuCI support for clash
-	PKGARCH:=all
+	PKGARCH:=aarch64_generic
 	DEPENDS:=+dnsmasq-full +bash +curl +ca-bundle +ip-full \
-	+ruby +ruby-yaml +kmod-tun +unzip
+	+ruby +ruby-gems +ruby-base64 +ruby-json +ruby-openssl +ruby-uri +ruby-yaml +ruby-zlib \
+	+kmod-tun +unzip
 	MAINTAINER:=vernesong
 endef
 
 define Package/$(PKG_NAME)/description
-    A LuCI support for clash
+    OpenClash 0.47.156 bundled with the pinned Mihomo core (x365-v4)
 endef
 
 define Build/Prepare
+	test -x $(CURDIR)/root/usr/libexec/openclash/clash_meta
+	$(TARGET_CROSS)readelf -h $(CURDIR)/root/usr/libexec/openclash/clash_meta | grep -q 'Machine:.*AArch64'
 	$(CP) $(CURDIR)/root $(PKG_BUILD_DIR)
 	$(CP) $(CURDIR)/luasrc $(PKG_BUILD_DIR)
 	$(foreach po,$(wildcard ${CURDIR}/po/zh-cn/*.po), \
 		po2lmo $(po) $(PKG_BUILD_DIR)/$(patsubst %.po,%.lmo,$(notdir $(po)));)
 	chmod 0755 $(PKG_BUILD_DIR)/root/etc/init.d/openclash
+	chmod 0755 $(PKG_BUILD_DIR)/root/usr/libexec/openclash/clash_meta
+	chmod 0755 $(PKG_BUILD_DIR)/root/usr/share/openclash/openclash_package_upgrade.sh
 	chmod -R 0755 $(PKG_BUILD_DIR)/root/usr/share/openclash/
 	exit 0
 endef
@@ -68,33 +74,85 @@ define Build/Compile
 endef
 
 define Package/$(PKG_NAME)/conffiles
+/etc/config/openclash
 endef
 
 define Package/$(PKG_NAME)/preinst
 #!/bin/sh
-	if [ -f "/etc/config/openclash" ] && [ ! -f "/tmp/openclash.bak" ]; then
-		cp -f "/etc/config/openclash" "/tmp/openclash.bak" >/dev/null 2>&1
-		cp -rf "/etc/openclash" "/tmp/openclash" >/dev/null 2>&1
-		cp -rf "/usr/share/openclash/ui" "/tmp/openclash_ui" >/dev/null 2>&1
-		cp -rf "/www/luci-static/resources/openclash/pac" "/tmp/pac" >/dev/null 2>&1
+	UPGRADE_LOG="/etc/openclash-upgrade.log"
+	preinst_log() {
+		PREINST_MESSAGE="$$*"
+		printf '%s %s\n' "$$(date '+%Y-%m-%dT%H:%M:%S%z' 2>/dev/null || date)" "$${PREINST_MESSAGE}" >> "$${UPGRADE_LOG}" 2>/dev/null || true
+		chmod 0600 "$${UPGRADE_LOG}" 2>/dev/null || true
+		logger -t openclash-upgrade "$${PREINST_MESSAGE}" 2>/dev/null || true
+	}
+	preinst_fail() {
+		preinst_log "phase=preinst result=failed stage=$$1 exit=1 target=$(PKG_VERSION)-r$(PKG_RELEASE)"
+		printf 'openclash-upgrade: preinst failed at %s\n' "$$1" >&2
+		exit 1
+	}
+	preinst_log "phase=preinst event=start upgrade=$${PKG_UPGRADE:-0} target=$(PKG_VERSION)-r$(PKG_RELEASE)"
+	[ "$${PKG_UPGRADE:-0}" = "1" ] || exit 0
+	if [ -x "/usr/share/openclash/openclash_package_upgrade.sh" ]; then
+		if ! /usr/share/openclash/openclash_package_upgrade.sh backup; then
+			preinst_fail helper-backup
+		fi
+		preinst_log "phase=preinst result=ok stage=helper-backup target=$(PKG_VERSION)-r$(PKG_RELEASE)"
+		exit 0
 	fi
+
+	# First upgrade from an upstream package: the helper is not installed yet,
+	# so create the same verified persistent backup inline. Any failure aborts
+	# the package transaction instead of silently continuing without settings.
+	BACKUP_DIR="/etc/openclash-upgrade-backup"
+	STAGING_DIR="$${BACKUP_DIR}.new"
+	PREVIOUS_DIR="$${BACKUP_DIR}.previous"
+	[ -f "/etc/config/openclash" ] || preinst_fail config-check
+	rm -rf "$${STAGING_DIR}" || preinst_fail staging-cleanup
+	mkdir -p "$${STAGING_DIR}" || preinst_fail staging-create
+	cp -p "/etc/config/openclash" "$${STAGING_DIR}/openclash.uci" || preinst_fail config-copy
+	printf '%s\n' './core' './core/*' 'core' 'core/*' > "$${STAGING_DIR}/core.exclude" || preinst_fail core-exclude-create
+	if [ -d "/etc/openclash" ]; then
+		tar -C "/etc/openclash" -X "$${STAGING_DIR}/core.exclude" -czf "$${STAGING_DIR}/openclash-data.tar.gz" . || preinst_fail data-archive
+	else
+		tar -czf "$${STAGING_DIR}/openclash-data.tar.gz" -T /dev/null || preinst_fail empty-archive
+	fi
+	if tar -tzf "$${STAGING_DIR}/openclash-data.tar.gz" | grep -q '^\./core\(/\|$$\)'; then
+		preinst_fail core-exclusion
+	fi
+	(
+		cd "$${STAGING_DIR}" || exit 1
+		sha256sum openclash.uci openclash-data.tar.gz > checksums
+	) || preinst_fail checksum-create
+	if pidof clash >/dev/null 2>&1; then
+		echo 1 > "$${STAGING_DIR}/was-running" || preinst_fail running-marker
+	else
+		echo 0 > "$${STAGING_DIR}/was-running" || preinst_fail running-marker
+	fi
+	touch "$${STAGING_DIR}/backup-complete" || preinst_fail completion-marker
+	rm -rf "$${PREVIOUS_DIR}" || preinst_fail previous-cleanup
+	[ ! -e "$${BACKUP_DIR}" ] || mv "$${BACKUP_DIR}" "$${PREVIOUS_DIR}" || preinst_fail previous-rotate
+	if ! mv "$${STAGING_DIR}" "$${BACKUP_DIR}"; then
+		[ -e "$${BACKUP_DIR}" ] || [ ! -e "$${PREVIOUS_DIR}" ] || mv "$${PREVIOUS_DIR}" "$${BACKUP_DIR}"
+		preinst_fail backup-activate
+	fi
+	rm -rf "$${PREVIOUS_DIR}" || preinst_fail previous-finalize
+	preinst_log "phase=preinst result=ok stage=inline-backup target=$(PKG_VERSION)-r$(PKG_RELEASE)"
 	exit 0
 endef
 
 define Package/$(PKG_NAME)/postinst
 #!/bin/sh
+	if [ -r "/usr/share/openclash/openclash_upgrade_log.sh" ]; then
+		. /usr/share/openclash/openclash_upgrade_log.sh
+		openclash_upgrade_log "phase=postinst result=ok upgrade=$${PKG_UPGRADE:-0} target=$(PKG_VERSION)-r$(PKG_RELEASE)"
+	fi
 	exit 0
 endef
 
 define Package/$(PKG_NAME)/prerm
 #!/bin/sh
-	[ -n "$(pidof clash)" ] && /etc/init.d/openclash stop 2>/dev/null
-	if [ -f "/etc/config/openclash" ] && [ ! -f "/tmp/openclash.bak" ]; then
-		cp -f "/etc/config/openclash" "/tmp/openclash.bak" >/dev/null 2>&1
-		cp -rf "/etc/openclash" "/tmp/openclash" >/dev/null 2>&1
-		cp -rf "/usr/share/openclash/ui" "/tmp/openclash_ui" >/dev/null 2>&1
-		cp -rf "/www/luci-static/resources/openclash/pac" "/tmp/pac" >/dev/null 2>&1
-	fi
+	[ -n "$$(pidof clash)" ] && /etc/init.d/openclash stop 2>/dev/null
 	exit 0
 endef
 
@@ -125,10 +183,9 @@ define Package/$(PKG_NAME)/postrm
 	rm -rf /tmp/openclash_oix_version.json >/dev/null 2>&1
 	rm -rf /tmp/openclash_version_history_* >/dev/null 2>&1
 	rm -rf /tmp/openclash_cdn_info_* >/dev/null 2>&1
-	sed -i 's/\(HTTP_MAX_CONTENT[[:space:]]*=[[:space:]]*\)[0-9][0-9]*\([[:space:]]*\*[[:space:]]*[0-9][0-9]*\)*/\11024*100/' /usr/lib/lua/luci/http.lua >/dev/null 2>&1
-	sed -i 's/\(HTTP_MAX_CONTENT[[:space:]]*=[[:space:]]*\)[0-9][0-9]*\([[:space:]]*\*[[:space:]]*[0-9][0-9]*\)*/\11024*100/' /usr/share/ucode/luci/http.uc >/dev/null 2>&1
-	rm -f /etc/nginx/conf.d/openclash.conf >/dev/null 2>&1
-	[ -x /etc/init.d/nginx ] && /etc/init.d/nginx reload >/dev/null 2>&1
+	sed -i '/OpenClash Append/,/OpenClash Append End/d' "/usr/lib/lua/luci/model/network.lua" >/dev/null 2>&1
+	sed -i '/.*kB maximum content size*/c\HTTP_MAX_CONTENT      = 1024*100		-- 100 kB maximum content size' /usr/lib/lua/luci/http.lua >/dev/null 2>&1
+	sed -i '/.*kB maximum content size*/c\export let HTTP_MAX_CONTENT = 1024*100;		// 100 kB maximum content size' /usr/share/ucode/luci/http.uc >/dev/null 2>&1
 	uci -q delete firewall.openclash
 	uci -q commit firewall
 	[ -f "/etc/config/ucitrack" ] && {
