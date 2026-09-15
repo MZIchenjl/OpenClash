@@ -501,17 +501,44 @@ msgstr "Dirección pública del panel"
 msgid "Domain Name For Dashboard Login From Public Network"
 msgstr "Dominio para iniciar sesión en el panel desde Internet"
 
+msgid "Domain Name or IP For Dashboard Login From Public Network (without http:// or https://)"
+msgstr "Dominio o IP para iniciar sesión en el panel desde Internet (sin http:// ni https://)"
+
+msgid "Enter a valid hostname or IP address without a path or user information"
+msgstr "Introduzca un nombre de host o dirección IP válidos sin ruta ni información de usuario"
+
 msgid "Public Dashboard Port"
 msgstr "Puerto público del panel"
 
 msgid "Port For Dashboard Login From Public Network"
 msgstr "Puerto usado para iniciar sesión en el panel desde Internet"
 
+msgid "Optional Port For Dashboard Login From Public Network (defaults to 443 with SSL or 80 without SSL)"
+msgstr "Puerto opcional para iniciar sesión en el panel desde Internet (predeterminado: 443 con SSL o 80 sin SSL)"
+
 msgid "Public Dashboard SSL enabled"
 msgstr "Habilitar SSL para acceso público"
 
 msgid "Is SSL enabled For Dashboard Login From Public Network"
 msgstr "Indica si el acceso al panel desde Internet utiliza SSL"
+
+msgid "Custom Dashboard URL"
+msgstr "URL personalizada del panel"
+
+msgid "Optional complete HTTP(S) URL for an externally hosted Dashboard. OpenClash appends hostname, port and secret parameters without adding a local UI path. Include a hash route such as #/setup in the URL when required by the panel."
+msgstr "URL HTTP(S) completa opcional de un panel alojado externamente. OpenClash añade los parámetros hostname, port y secret sin añadir una ruta de interfaz local. Incluya una ruta hash como #/setup en la URL cuando el panel lo requiera."
+
+msgid "External Dashboard"
+msgstr "Panel externo"
+
+msgid "Clash Dashboard Compatibility Mode"
+msgstr "Modo de compatibilidad de Clash Dashboard"
+
+msgid "Use Clash Dashboard-compatible #/?host=... login parameters for the custom Dashboard URL instead of the standard hostname parameters."
+msgstr "Use parámetros de inicio de sesión compatibles con Clash Dashboard #/?host=... para la URL del panel personalizado en lugar de los parámetros hostname estándar."
+
+msgid "Enter a valid complete HTTP or HTTPS URL without user information"
+msgstr "Introduzca una URL HTTP o HTTPS completa válida sin información de usuario"
 
 msgid "GEO Update"
 msgstr "Actualización de bases GEO"
@@ -1164,6 +1191,15 @@ msgstr "Mejorado"
 msgid "Compat"
 msgstr "Compatible"
 
+msgid "Fake-IP"
+msgstr "Fake-IP"
+
+msgid "Redir-Host"
+msgstr "Redir-Host"
+
+msgid "Switch mode failed!"
+msgstr "¡Falló el cambio de modo!"
+
 msgid "Mix"
 msgstr "Mixto"
 
@@ -1620,6 +1656,21 @@ msgstr "Error al mover el núcleo:"
 msgid "Core Verification Failed:"
 msgstr "Error al verificar el núcleo:"
 
+msgid "Checksum Verification Failed"
+msgstr "Fallo de la verificación de Checksum"
+
+msgid "Checksum Verification Successful for"
+msgstr "Verificación de Checksum correcta para"
+
+msgid "Checksum file unavailable or entry not found, skip verification for"
+msgstr "Archivo de verificación de Checksum no disponible o entrada no encontrada, se omite la verificación"
+
+msgid "Checksum mismatch for"
+msgstr "La verificación de Checksum no coincide"
+
+msgid "Unable to compute checksum, skip verification for"
+msgstr "No se puede calcular el Checksum, se omite la verificación"
+
 msgid "No Compiled Version Selected, Please Select In Update Page And Try Again!"
 msgstr "No se ha seleccionado ninguna versión compilada; selecciónala en la página de actualización."
 
@@ -2025,6 +2076,9 @@ msgstr "Fallo al obtener proxy-groups,"
 msgid "Set Hosts Rules Failed,"
 msgstr "Fallo al modificar Hosts,"
 
+msgid "Set Built-in Hosts Failed,"
+msgstr "Fallo al modificar los Hosts integrados,"
+
 msgid "Set Fake-IP-Filter Failed,"
 msgstr "Fallo al modificar Fake-IP-Filter,"
 
@@ -2077,7 +2131,7 @@ msgid "Up"
 msgstr "Subida"
 
 msgid "Down"
-"Descarga"
+msgstr "Descarga"
 
 msgid "Up Total"
 msgstr "Total subido"
@@ -2086,16 +2140,25 @@ msgid "Down Total"
 msgstr "Total descargado"
 
 msgid "Connect"
-msgstr "Conexiones activas"
+msgstr "Conexiones"
 
 msgid "Ram"
-msgstr "Uso de RAM"
+msgstr "Memoria"
 
 msgid "CPU"
-msgstr "Uso de CPU"
+msgstr "CPU"
 
 msgid "Load Avg"
-msgstr "Carga media"
+msgstr "Carga"
+
+msgid "Statistics"
+msgstr "Datos en ejecución"
+
+msgid "Cards"
+msgstr "Tarjetas"
+
+msgid "Chart"
+msgstr "Gráfico"
 
 msgid "Bad address specified!"
 msgstr "Dirección no válida."
@@ -3601,7 +3664,7 @@ msgid "Expire Date"
 msgstr "Fecha de caducidad"
 
 msgid "RAW"
-msgstr "RAW"
+msgstr "Enlace directo"
 
 msgid "Address"
 msgstr "Dirección"
@@ -3659,6 +3722,12 @@ msgstr "URL no válida. Cuando la conversión está deshabilitada solo se admite
 
 msgid "Advanced Options"
 msgstr "Opciones avanzadas"
+
+msgid "Node Filtering"
+msgstr "Filtrado de nodos"
+
+msgid "Show node filter options"
+msgstr "Mostrar opciones de filtrado de nodos"
 
 msgid "Show more subscription options"
 msgstr "Mostrar más opciones de suscripción"
@@ -4139,6 +4208,9 @@ msgstr "Asistente Experto de OpenClash"
 
 msgid "The guide is the single source of truth — it covers everything from debug log procedures to external resource queries. Do NOT rely on memory; always verify against the guide."
 msgstr "La guía es la única fuente autorizada — cubre todo, desde los procedimientos de registro de depuración hasta las consultas de recursos externos. NO confíes en la memoria; verifica siempre con la guía."
+
+msgid "Routing: After reading the guide, consult its Document Routing Table, pick the sub-document(s) matching my question, and fetch their content via the raw URLs given in the table before answering."
+msgstr "Enrutamiento: después de leer la guía, consulta su Tabla de Enrutamiento de Documentos, elige el/los subdocumento(s) que coincidan con mi pregunta y obtén su contenido mediante las URLs raw indicadas en la tabla antes de responder."
 
 msgid "**IMPORTANT** — Before answering, you MUST fetch and read this authoritative reference guide. ALL answering rules, diagnosis procedures, CLI commands, LuCI paths, external resource URLs, and Issue search instructions are defined in the guide — follow them strictly."
 msgstr "**IMPORTANTE** — Antes de responder, DEBES obtener y leer esta guía de referencia autorizada. Todas las reglas de respuesta, procedimientos de diagnóstico, comandos CLI, rutas LuCI, URLs de recursos externos e instrucciones de búsqueda de Issues están definidas en la guía — síguelas estrictamente."

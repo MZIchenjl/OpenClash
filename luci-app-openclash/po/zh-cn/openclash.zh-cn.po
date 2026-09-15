@@ -503,17 +503,44 @@ msgstr "管理页面公网域名"
 msgid "Domain Name For Dashboard Login From Public Network"
 msgstr "设置公网域名，便于从公网访问时自动登录"
 
+msgid "Domain Name or IP For Dashboard Login From Public Network (without http:// or https://)"
+msgstr "设置用于公网访问的域名或 IP，请勿填写 http:// 或 https:// 协议头"
+
+msgid "Enter a valid hostname or IP address without a path or user information"
+msgstr "请输入不带路径或用户信息的有效主机名或 IP 地址"
+
 msgid "Public Dashboard Port"
 msgstr "管理页面映射端口"
 
 msgid "Port For Dashboard Login From Public Network"
 msgstr "设置映射端口，便于从公网访问时自动登录"
 
+msgid "Optional Port For Dashboard Login From Public Network (defaults to 443 with SSL or 80 without SSL)"
+msgstr "可选的公网映射端口；启用 SSL 时默认为 443，未启用时默认为 80"
+
 msgid "Public Dashboard SSL enabled"
 msgstr "管理页面公网 SSL 访问"
 
 msgid "Is SSL enabled For Dashboard Login From Public Network"
 msgstr "设置公网协议是否开启了 SSL，便于从公网访问时自动登录"
+
+msgid "Custom Dashboard URL"
+msgstr "自定义 Dashboard URL"
+
+msgid "Optional complete HTTP(S) URL for an externally hosted Dashboard. OpenClash appends hostname, port and secret parameters without adding a local UI path. Include a hash route such as #/setup in the URL when required by the panel."
+msgstr "可选的外部 Dashboard 完整 HTTP(S) URL。OpenClash 会追加 hostname、port 和 secret 参数，不会添加本地 UI 路径；如果面板需要 Hash 路由，请在 URL 中包含类似 #/setup 的路由。"
+
+msgid "External Dashboard"
+msgstr "外部面板"
+
+msgid "Clash Dashboard Compatibility Mode"
+msgstr "Clash Dashboard 兼容模式"
+
+msgid "Use Clash Dashboard-compatible #/?host=... login parameters for the custom Dashboard URL instead of the standard hostname parameters."
+msgstr "为自定义 Dashboard URL 使用 Clash Dashboard 兼容的 #/?host=... 登录参数，而不是标准的 hostname 参数。"
+
+msgid "Enter a valid complete HTTP or HTTPS URL without user information"
+msgstr "请输入不包含用户信息的有效完整 HTTP 或 HTTPS URL"
 
 msgid "GEO Update"
 msgstr "GEO 数据库订阅"
@@ -1167,6 +1194,15 @@ msgstr "增强"
 msgid "Compat"
 msgstr "兼容"
 
+msgid "Fake-IP"
+msgstr "Fake-IP"
+
+msgid "Redir-Host"
+msgstr "Redir-Host"
+
+msgid "Switch mode failed!"
+msgstr "切换模式失败！"
+
 msgid "Mix"
 msgstr "混合"
 
@@ -1623,6 +1659,21 @@ msgstr "内核移动失败:"
 msgid "Core Verification Failed:"
 msgstr "内核校验失败:"
 
+msgid "Checksum Verification Failed"
+msgstr "文件哈希校验失败"
+
+msgid "Checksum Verification Successful for"
+msgstr "文件哈希校验成功"
+
+msgid "Checksum file unavailable or entry not found, skip verification for"
+msgstr "校验文件不可用或未找到对应条目，跳过校验"
+
+msgid "Checksum mismatch for"
+msgstr "文件哈希不匹配"
+
+msgid "Unable to compute checksum, skip verification for"
+msgstr "无法计算文件哈希，跳过校验"
+
 msgid "No Compiled Version Selected, Please Select In Update Page And Try Again!"
 msgstr "未选择编译版本，请到升级页面选择后再试！"
 
@@ -2028,6 +2079,9 @@ msgstr "proxy-groups 获取失败，"
 msgid "Set Hosts Rules Failed,"
 msgstr "修改 Hosts 配置失败，"
 
+msgid "Set Built-in Hosts Failed,"
+msgstr "修改内置 Hosts 配置失败，"
+
 msgid "Set Fake-IP-Filter Failed,"
 msgstr "修改 Fake-IP-Filter 配置失败，"
 
@@ -2089,16 +2143,25 @@ msgid "Down Total"
 msgstr "下载总量"
 
 msgid "Connect"
-msgstr "活动连接"
+msgstr "连接"
 
 msgid "Ram"
-msgstr "内存占用"
+msgstr "内存"
 
 msgid "CPU"
-msgstr "CPU 占用"
+msgstr "CPU"
 
 msgid "Load Avg"
-msgstr "系统负载"
+msgstr "负载"
+
+msgid "Statistics"
+msgstr "运行数据"
+
+msgid "Cards"
+msgstr "卡片"
+
+msgid "Chart"
+msgstr "图表"
 
 msgid "Bad address specified!"
 msgstr "输入的地址不合法！"
@@ -3619,7 +3682,7 @@ msgid "Expire Date"
 msgstr "到期时间"
 
 msgid "RAW"
-msgstr "RAW"
+msgstr "直链"
 
 msgid "Address"
 msgstr "地址"
@@ -3677,6 +3740,12 @@ msgstr "订阅地址格式无效。未启用订阅转换时仅支持单个 HTTP/
 
 msgid "Advanced Options"
 msgstr "高级选项"
+
+msgid "Node Filtering"
+msgstr "节点筛选"
+
+msgid "Show node filter options"
+msgstr "显示节点筛选设置"
 
 msgid "Show more subscription options"
 msgstr "显示更多订阅设置"
@@ -4400,6 +4469,9 @@ msgstr "OpenClash 专家助手"
 
 msgid "The guide is the single source of truth — it covers everything from debug log procedures to external resource queries. Do NOT rely on memory; always verify against the guide."
 msgstr "指南是唯一权威来源 —— 涵盖从调试日志流程到外部资源查询的所有内容。禁止凭记忆回答，必须对照指南验证。"
+
+msgid "Routing: After reading the guide, consult its Document Routing Table, pick the sub-document(s) matching my question, and fetch their content via the raw URLs given in the table before answering."
+msgstr "路由：阅读指南后，查看其「文档路由表」，根据我的问题选取匹配的子文档，用表中给出的完整 raw URL 抓取内容后再回答。"
 
 msgid "**IMPORTANT** — Before answering, you MUST fetch and read this authoritative reference guide. ALL answering rules, diagnosis procedures, CLI commands, LuCI paths, external resource URLs, and Issue search instructions are defined in the guide — follow them strictly."
 msgstr "**重要** —— 在回答之前，你必须获取并阅读这份权威参考指南。所有回答规则、诊断流程、CLI 命令、LuCI 路径、外部资源 URL 和 Issue 搜索指引均在指南中定义 —— 请严格遵守。"

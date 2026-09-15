@@ -9,6 +9,7 @@
 <script src="/luci-static/resources/openclash/js/common.js?v=<%=plugin_version%>"></script>
 <link rel="stylesheet" href="/luci-static/resources/openclash/css/oc.css?v=<%=plugin_version%>">
 <script src="/luci-static/resources/openclash/js/cm6.min.js?v=<%=plugin_version%>"></script>
+<script src="/luci-static/resources/openclash/js/chart.umd.min.js?v=<%=plugin_version%>"></script>
 </head>
 <fieldset class="cbi-section">
     <table width="100%">
@@ -82,26 +83,45 @@
                         <!-- Row 2: Running Mode & Proxy Mode -->
                         <div class="card-row dual-cards mode-row">
                             <div class="sub-card">
-                                <div class="card-title"><%:Running Mode%></div>
+                                <div class="stats-card-header">
+                                    <div class="stats-title"><%:Running Mode%></div>
+                                    <span class="mode-pill" id="mode-pill">
+                                        <input type="radio" id="dns_fakeip" name="radios-dns" value="fake-ip" onclick="return switch_dns_mode(this.value)"/>
+                                        <label for="dns_fakeip" class="mode-pill-opt" title="<%:Fake-IP%>">
+                                            <svg width="13" height="13"><use href="#oc-icon-cloud-search"/></svg>
+                                        </label>
+                                        <input type="radio" id="dns_redirhost" name="radios-dns" value="redir-host" onclick="return switch_dns_mode(this.value)"/>
+                                        <label for="dns_redirhost" class="mode-pill-opt" title="<%:Redir-Host%>">
+                                            <svg width="13" height="13"><use href="#oc-icon-device-desktop-search"/></svg>
+                                        </label>
+                                    </span>
+                                </div>
                                 <div class="card-content">
-                                    <div class="card-value"><span id="_mode" class="value-indicator"><%:Collecting data...%></span></div>
                                     <div class="card-controls">
                                         <div id="radio-ru-mode" class="cbi-button-group oc-inline-flex">
-                                            <input type="radio" id="normal" name="radios-ru" value="" onclick="return switch_run_mode(this.value)"/><label for="normal" id="run_normal" class="cbi-button-option"><%:Compat%></label>
-                                            <input type="radio" id="tun" name="radios-ru" value="-tun" onclick="return switch_run_mode(this.value)"/><label for="tun" class="cbi-button-option"><%:TUN%></label>
-                                            <input type="radio" id="mix" name="radios-ru" value="-mix" onclick="return switch_run_mode(this.value)"/><label for="mix" class="cbi-button-option"><%:Mix%></label>
+                                            <input type="radio" id="normal" name="radios-ru" value="" onclick="return switch_run_mode(this.value)"/>
+                                            <label for="normal" id="run_normal" class="cbi-button-option"><%:Compat%></label>
+                                            <input type="radio" id="tun" name="radios-ru" value="-tun" onclick="return switch_run_mode(this.value)"/>
+                                            <label for="tun" class="cbi-button-option"><%:TUN%></label>
+                                            <input type="radio" id="mix" name="radios-ru" value="-mix" onclick="return switch_run_mode(this.value)"/>
+                                            <label for="mix" class="cbi-button-option"><%:Mix%></label>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="sub-card">
-                                <div class="card-title"><%:Proxy Mode%></div>
+                                <div class="stats-card-header">
+                                    <div class="stats-title"><%:Proxy Mode%></div>
+                                </div>
                                 <div class="card-content">
                                     <div class="card-controls">
                                         <div id="radio-mode" class="cbi-button-group oc-inline-flex">
-                                            <input type="radio" id="rule" name="radios" value="rule" onclick="return switch_rule_mode(this.value)"/><label for="rule" class="cbi-button-option"><%:Rule%></label>
-                                            <input type="radio" id="global" name="radios" value="global" onclick="return switch_rule_mode(this.value)"/><label for="global" class="cbi-button-option"><%:Global%></label>
-                                            <input type="radio" id="direct" name="radios" value="direct" onclick="return switch_rule_mode(this.value)"/><label for="direct" class="cbi-button-option"><%:Direct%></label>
+                                            <input type="radio" id="rule" name="radios" value="rule" onclick="return switch_rule_mode(this.value)"/>
+                                            <label for="rule" class="cbi-button-option"><%:Rule%></label>
+                                            <input type="radio" id="global" name="radios" value="global" onclick="return switch_rule_mode(this.value)"/>
+                                            <label for="global" class="cbi-button-option"><%:Global%></label>
+                                            <input type="radio" id="direct" name="radios" value="direct" onclick="return switch_rule_mode(this.value)"/>
+                                            <label for="direct" class="cbi-button-option"><%:Direct%></label>
                                         </div>
                                     </div>
                                 </div>
@@ -115,9 +135,12 @@
                                 <div class="card-content">
                                     <div class="card-controls">
                                         <div id="oc-setting-oversea" class="cbi-button-group oc-inline-flex">
-                                            <input type="radio" id="oc_setting_oversea_1" name="oc-setting-oversea" value="1" onclick="return switch_oc_setting_oversea('1')"/><label for="oc_setting_oversea_1" class="cbi-button-option"><%:Mainland%></label>
-                                            <input type="radio" id="oc_setting_oversea_2" name="oc-setting-oversea" value="2" onclick="return switch_oc_setting_oversea('2')"/><label for="oc_setting_oversea_2" class="cbi-button-option"><%:Oversea%></label>
-                                            <input type="radio" id="oc_setting_oversea_0" name="oc-setting-oversea" value="0" onclick="return switch_oc_setting_oversea('0')"/><label for="oc_setting_oversea_0" class="cbi-button-option"><%:Off%></label>
+                                            <input type="radio" id="oc_setting_oversea_1" name="oc-setting-oversea" value="1" onclick="return switch_oc_setting_oversea('1')"/>
+                                            <label for="oc_setting_oversea_1" class="cbi-button-option"><%:Mainland%></label>
+                                            <input type="radio" id="oc_setting_oversea_2" name="oc-setting-oversea" value="2" onclick="return switch_oc_setting_oversea('2')"/>
+                                            <label for="oc_setting_oversea_2" class="cbi-button-option"><%:Oversea%></label>
+                                            <input type="radio" id="oc_setting_oversea_0" name="oc-setting-oversea" value="0" onclick="return switch_oc_setting_oversea('0')"/>
+                                            <label for="oc_setting_oversea_0" class="cbi-button-option"><%:Off%></label>
                                         </div>
                                     </div>
                                 </div>
@@ -127,8 +150,10 @@
                                 <div class="card-content">
                                     <div class="card-controls">
                                         <div id="dns-setting-sniffer" class="cbi-button-group oc-inline-flex">
-                                            <input type="radio" id="meta_sniffer_on" name="meta-sniffer-radios" value="1" onclick="return switch_meta_sniffer('1')"/><label for="meta_sniffer_on" class="cbi-button-option"><%:On%></label>
-                                            <input type="radio" id="meta_sniffer_off" name="meta-sniffer-radios" value="0" onclick="return switch_meta_sniffer('0')"/><label for="meta_sniffer_off" class="cbi-button-option"><%:Off%></label>
+                                            <input type="radio" id="meta_sniffer_on" name="meta-sniffer-radios" value="1" onclick="return switch_meta_sniffer('1')"/>
+                                            <label for="meta_sniffer_on" class="cbi-button-option"><%:On%></label>
+                                            <input type="radio" id="meta_sniffer_off" name="meta-sniffer-radios" value="0" onclick="return switch_meta_sniffer('0')"/>
+                                            <label for="meta_sniffer_off" class="cbi-button-option"><%:Off%></label>
                                         </div>
                                     </div>
                                 </div>
@@ -138,8 +163,10 @@
                                 <div class="card-content">
                                     <div class="card-controls">
                                         <div id="dns-setting-respect" class="cbi-button-group oc-inline-flex">
-                                            <input type="radio" id="respect_rules_on" name="respect-rules-radios" value="1" onclick="return switch_respect_rules('1')"/><label for="respect_rules_on" class="cbi-button-option"><%:On%></label>
-                                            <input type="radio" id="respect_rules_off" name="respect-rules-radios" value="0" onclick="return switch_respect_rules('0')"/><label for="respect_rules_off" class="cbi-button-option"><%:Off%></label>
+                                            <input type="radio" id="respect_rules_on" name="respect-rules-radios" value="1" onclick="return switch_respect_rules('1')"/>
+                                            <label for="respect_rules_on" class="cbi-button-option"><%:On%></label>
+                                            <input type="radio" id="respect_rules_off" name="respect-rules-radios" value="0" onclick="return switch_respect_rules('0')"/>
+                                            <label for="respect_rules_off" class="cbi-button-option"><%:Off%></label>
                                         </div>
                                     </div>
                                 </div>
@@ -149,8 +176,10 @@
                                 <div class="card-content">
                                     <div class="card-controls">
                                         <div id="stream-unlock-setting" class="cbi-button-group oc-inline-flex">
-                                            <input type="radio" id="stream_unlock_on" name="stream-unlock-radios" value="1" onclick="return switch_stream_unlock('1')"/><label for="stream_unlock_on" class="cbi-button-option"><%:On%></label>
-                                            <input type="radio" id="stream_unlock_off" name="stream-unlock-radios" value="0" onclick="return switch_stream_unlock('0')"/><label for="stream_unlock_off" class="cbi-button-option"><%:Off%></label>
+                                            <input type="radio" id="stream_unlock_on" name="stream-unlock-radios" value="1" onclick="return switch_stream_unlock('1')"/>
+                                            <label for="stream_unlock_on" class="cbi-button-option"><%:On%></label>
+                                            <input type="radio" id="stream_unlock_off" name="stream-unlock-radios" value="0" onclick="return switch_stream_unlock('0')"/>
+                                            <label for="stream_unlock_off" class="cbi-button-option"><%:Off%></label>
                                         </div>
                                     </div>
                                 </div>
@@ -160,7 +189,9 @@
                         <!-- Row 4: Config File -->
                         <div class="card-row full-width">
                             <div class="sub-card">
-                                <div class="card-title"><%:Config File%></div>
+                                <div class="stats-card-header">
+                                    <div class="stats-title"><%:Config File%></div>
+                                </div>
                                 <div class="config-file-content">
                                     <div id="subscription-info-display" class="subscription-info-container oc-hidden">
                                         <div class="subscription-nav-arrow left" id="subscription-prev-arrow" onclick="switchToPreviousConfig()" title="<%:Previous%>"></div>
@@ -261,6 +292,7 @@
                                     <button class="dashboard-btn" id="_webm"><%:Collecting data...%></button>
                                     <button class="dashboard-btn" id="_webz"><%:Collecting data...%></button>
                                     <button class="dashboard-btn" id="_webo"><%:Collecting data...%></button>
+                                    <button class="dashboard-btn hidden" id="_web_external"><%:Collecting data...%></button>
                                 </div>
                             </div>
                         </div>
@@ -278,15 +310,47 @@
                         </div>
 
                         <!-- Row 4: Statistics -->
-                        <div class="card-row stats-grid">
-                            <div class="sub-card stat-item"><span class="stat-label"><%:Up%></span><span id="upload_" class="stat-value">0 KB/S</span></div>
-                            <div class="sub-card stat-item"><span class="stat-label"><%:Down%></span><span id="download_" class="stat-value">0 KB/S</span></div>
-                            <div class="sub-card stat-item"><span class="stat-label"><%:Up Total%></span><span id="uploadtotal_" class="stat-value">0 KB</span></div>
-                            <div class="sub-card stat-item"><span class="stat-label"><%:Down Total%></span><span id="downloadtotal_" class="stat-value">0 KB</span></div>
-                            <div class="sub-card stat-item"><span class="stat-label"><%:Connect%></span><span id="connect_t" class="stat-value">0</span></div>
-                            <div class="sub-card stat-item"><span class="stat-label"><%:Ram%></span><span id="mem_t" class="stat-value">0 KB</span></div>
-                            <div class="sub-card stat-item"><span class="stat-label"><%:CPU%></span><span id="cpu_t" class="stat-value">0 %</span></div>
-                            <div class="sub-card stat-item"><span class="stat-label"><%:Load Avg%></span><span id="load_a" class="stat-value">0 %</span></div>
+                        <div class="stats-section">
+                            <div class="stats-card-header">
+                                <div class="stats-title"><%:Statistics%></div>
+                                <div class="icon-pill stats-view-toggle" id="stats-view-toggle" role="group" aria-label="<%:View Mode%>">
+                                    <button type="button" class="icon-pill-opt" id="stats-cards-btn" title="<%:Cards%>" data-view="cards">
+                                        <svg width="13" height="13"><use href="#oc-icon-grid"/></svg>
+                                    </button>
+                                    <button type="button" class="icon-pill-opt" id="stats-chart-btn" title="<%:Chart%>" data-view="chart">
+                                        <svg width="13" height="13"><use href="#oc-icon-chart"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-row stats-grid" id="stats-view-cards">
+                                <div class="sub-card stat-item"><span class="stat-label"><%:Up%></span><span id="upload_" class="stat-value"><span class="stat-num" style="color:var(--success-color)">0</span><span class="stat-unit">KB/S</span></span></div>
+                                <div class="sub-card stat-item"><span class="stat-label"><%:Down%></span><span id="download_" class="stat-value"><span class="stat-num" style="color:var(--success-color)">0</span><span class="stat-unit">KB/S</span></span></div>
+                                <div class="sub-card stat-item"><span class="stat-label"><%:Up Total%></span><span id="uploadtotal_" class="stat-value"><span class="stat-num" style="color:var(--success-color)">0</span><span class="stat-unit">KB</span></span></div>
+                                <div class="sub-card stat-item"><span class="stat-label"><%:Down Total%></span><span id="downloadtotal_" class="stat-value"><span class="stat-num" style="color:var(--success-color)">0</span><span class="stat-unit">KB</span></span></div>
+                                <div class="sub-card stat-item"><span class="stat-label"><%:Connect%></span><span id="connect_t" class="stat-value"><span class="stat-num" style="color:var(--success-color)">0</span></span></div>
+                                <div class="sub-card stat-item"><span class="stat-label"><%:Ram%></span><span id="mem_t" class="stat-value"><span class="stat-num" style="color:var(--success-color)">0</span><span class="stat-unit">KB</span></span></div>
+                                <div class="sub-card stat-item"><span class="stat-label"><%:CPU%></span><span id="cpu_t" class="stat-value"><span class="stat-num" style="color:var(--success-color)">0</span><span class="stat-unit">%</span></span></div>
+                                <div class="sub-card stat-item"><span class="stat-label"><%:Load Avg%></span><span id="load_a" class="stat-value"><span class="stat-num" style="color:var(--success-color)">0</span><span class="stat-unit">%</span></span></div>
+                            </div>
+
+                            <div class="stats-chart-card oc-hidden" id="stats-view-chart">
+                                <div class="stats-chart-header">
+                                    <div class="stats-legend" id="stats-legend"></div>
+                                </div>
+                                <div class="stats-chart-wrap"><canvas id="stats-chart"></canvas></div>
+                            </div>
+                            <div class="cbi-button-group stats-tabs oc-hidden" id="stats-tabs">
+                                <input type="radio" id="stats-metric-traffic" name="stats-metric" value="traffic" checked/>
+                                <label for="stats-metric-traffic" class="cbi-button-option"><%:Traffic%></label>
+                                <input type="radio" id="stats-metric-connections" name="stats-metric" value="connections"/>
+                                <label for="stats-metric-connections" class="cbi-button-option"><%:Connect%></label>
+                                <input type="radio" id="stats-metric-memory" name="stats-metric" value="memory"/>
+                                <label for="stats-metric-memory" class="cbi-button-option"><%:Ram%></label>
+                                <input type="radio" id="stats-metric-cpu" name="stats-metric" value="cpu"/>
+                                <label for="stats-metric-cpu" class="cbi-button-option"><%:CPU%></label>
+                                <input type="radio" id="stats-metric-load" name="stats-metric" value="load"/>
+                                <label for="stats-metric-load" class="cbi-button-option"><%:Load Avg%></label>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -341,11 +405,13 @@
     };
     var DOMCache = {
         clash: document.getElementById('_clash'),
-        mode: document.getElementById('_mode'),
+        dns_fakeip: document.getElementById('dns_fakeip'),
+        dns_redirhost: document.getElementById('dns_redirhost'),
         web: document.getElementById('_web'),
         webo: document.getElementById('_webo'),
         webm: document.getElementById('_webm'),
         webz: document.getElementById('_webz'),
+        web_external: document.getElementById('_web_external'),
         daip: document.getElementById('_daip'),
         oclog: document.getElementById('_oclog'),
         close_all_connection: document.getElementById('_close_all_connection_btn'),
@@ -381,9 +447,21 @@
     };
 
     var getDashboardBaseURL = ocGetDashboardBaseURL;
+    var getDashboardWebSocketOrigin = ocGetDashboardWebSocketOrigin;
     var buildDashboardURL = ocBuildDashboardURL;
+    var buildExternalDashboardURL = ocBuildExternalDashboardURL;
     var bytesToSize = ocFormatBytes;
     var debounceButton = ocDebounce;
+
+    function ocStatHtml(text, color) {
+        color = color || 'var(--success-color)';
+        var s = String(text);
+        var m = s.match(/^([\d.]+)\s*(.*)$/);
+        var num = m ? m[1] : s;
+        var unit = m ? m[2] : '';
+        return '<span class="stat-num" style="color:' + color + '">' + num + '</span>'
+            + (unit ? '<span class="stat-unit">' + unit + '</span>' : '');
+    }
 
     var DarkModeDetector = {
         init: function() {
@@ -419,7 +497,7 @@
         cache_ttl: 5000,
         pending_requests: new Map(),
 
-        _cachedXHR: function(url, params, callback, force) {
+        cachedXHR: function(url, params, callback, force) {
             var cacheKey = params ? url + JSON.stringify(params) : url;
             var now = Date.now();
 
@@ -442,7 +520,7 @@
                 setTimeout(function() {
                     callback({ status: 200, fromCache: true, stale: true }, StateManager.request_cache[cacheKey]);
                 }, 0);
-                this._refreshCacheSilent(url, params, cacheKey);
+                this.refreshCacheSilent(url, params, cacheKey);
                 return;
             }
 
@@ -469,11 +547,11 @@
         },
 
         cachedXHRGet: function(url, callback, force) {
-            this._cachedXHR(url, null, callback, force);
+            this.cachedXHR(url, null, callback, force);
         },
 
         cachedXHRGetWithParams: function(url, params, callback, force) {
-            this._cachedXHR(url, params, callback, force);
+            this.cachedXHR(url, params, callback, force);
         },
 
         clearCache: function(url, params) {
@@ -508,12 +586,14 @@
             for (var i = 0; i < updates.length; i++) {
                 var update = updates[i];
                 if (update.element && update.content !== undefined) {
-                    update.element.innerHTML = update.content;
+                    if (update.element.innerHTML !== update.content) {
+                        update.element.innerHTML = update.content;
+                    }
                 }
             }
         },
 
-        _refreshCacheSilent: function(url, params, cacheKey) {
+        refreshCacheSilent: function(url, params, cacheKey) {
             var self = this;
             XHR.get(url, params, function(x, data) {
                 if (x && x.status == 200 && data) {
@@ -556,8 +636,8 @@
         reconnectDelay: 5000,
         heartbeatInterval: 30000,
         heartbeatTimers: {},
-        _ws_connect: false,
-        _allowedCloseCodes: [1000, 1001, 1005, 1006],
+        wsConnect: false,
+        allowedCloseCodes: [1000, 1001, 1005, 1006],
 
         isSupported: function() {
             return typeof window.WebSocket !== "undefined";
@@ -618,7 +698,7 @@
                 }
             }, this.heartbeatInterval);
 
-            if (!this._visibilityHandlerAdded) {
+            if (!this.visibilityHandlerAdded) {
                 document.addEventListener('visibilitychange', function() {
                     if (document.hidden) {
                         for (var t in self.heartbeatTimers) {
@@ -632,7 +712,7 @@
                         }
                     }
                 });
-                this._visibilityHandlerAdded = true;
+                this.visibilityHandlerAdded = true;
             }
         },
 
@@ -652,6 +732,10 @@
 
         closeConnection: function(type) {
             var connection = this.connections[type];
+            if (this.pendingReconnect && this.pendingReconnect[type]) {
+                clearTimeout(this.pendingReconnect[type]);
+                delete this.pendingReconnect[type];
+            }
             if (connection && connection.socket) {
                 this.stopHeartbeat(type);
                 try {
@@ -666,7 +750,7 @@
             for (var i = 0; i < types.length; i++) {
                 this.closeConnection(types[i]);
             }
-            this._ws_connect = false;
+            this.wsConnect = false;
         },
 
         handleMessage: function(type, event) {
@@ -695,7 +779,7 @@
             }
             this.startHeartbeat(type);
 
-            if (!this._ws_connect) {
+            if (!this.wsConnect) {
                 var connectedCount = 0;
                 for (var t in this.connections) {
                     if (this.connections[t].state === this.connectionStates.CONNECTED) {
@@ -703,7 +787,7 @@
                     }
                 }
                 if (connectedCount >= 1) {
-                    this._ws_connect = true;
+                    this.wsConnect = true;
                     if (NetworkStatsManager.isEnabled) {
                         NetworkStatsManager.stop();
                     }
@@ -723,13 +807,17 @@
 
         handleClose: function(type, event) {
             var connection = this.connections[type];
-            if (connection) {
+            if (connection && connection.socket === event.target) {
                 connection.state = this.connectionStates.DISCONNECTED;
-            }
-            this.stopHeartbeat(type);
+                this.stopHeartbeat(type);
 
-            if (this._allowedCloseCodes.indexOf(event.code) === -1) {
-                this.scheduleReconnect(type);
+                if (typeof StatsChart !== 'undefined' && StatsChart.resetToZero) {
+                    StatsChart.resetToZero();
+                }
+
+                if (this.allowedCloseCodes.indexOf(event.code) === -1) {
+                    this.scheduleReconnect(type);
+                }
             }
         },
 
@@ -755,18 +843,30 @@
             var handler = connection.messageHandler;
             var options = connection.options;
 
-            setTimeout(function() {
+            this.pendingReconnect = this.pendingReconnect || {};
+            this.pendingReconnect[type] = setTimeout(function() {
+                delete self.pendingReconnect[type];
                 self.createConnection(type, url, handler, options);
             }, this.reconnectDelay);
         },
 
         enableFallbackMode: function() {
-            this._ws_connect = false;
-            this.closeAll();
-            NetworkStatsManager.resetStats();
-            if (!NetworkStatsManager.isEnabled) {
-                NetworkStatsManager.start();
+            this.wsConnect = false;
+            var types = Object.keys(this.connections);
+            for (var i = 0; i < types.length; i++) {
+                var connection = this.connections[types[i]];
+                if (connection && connection.socket) {
+                    this.stopHeartbeat(types[i]);
+                    try {
+                        connection.socket.close(1000, 'Normal closure');
+                    } catch (error) {}
+                    delete this.connections[types[i]];
+                }
             }
+            NetworkStatsManager.resetStats();
+            if (typeof StatsChart !== 'undefined' && StatsChart.resetToZero) StatsChart.resetToZero();
+            if (typeof StatsWSMeta !== 'undefined') StatsWSMeta.protocol = null;
+            if (typeof syncDataSource === 'function') syncDataSource();
         },
 
         getConnectionState: function(type) {
@@ -932,9 +1032,9 @@
 
                 this.updateNavigationArrows();
 
-                if (this._retryGetConfigList) {
-                    clearInterval(this._retryGetConfigList);
-                    this._retryGetConfigList = null;
+                if (this.retryGetConfigList) {
+                    clearInterval(this.retryGetConfigList);
+                    this.retryGetConfigList = null;
                 }
 
             } catch (e) {
@@ -950,9 +1050,9 @@
             this.toggleEmptyState(true);
             this.hideSubscriptionDisplay();
 
-            if (!this._retryGetConfigList) {
+            if (!this.retryGetConfigList) {
                 var self = this;
-                this._retryGetConfigList = setInterval(function() {
+                this.retryGetConfigList = setInterval(function() {
                     self.loadConfigFileList(true);
                 }, 5000);
             }
@@ -1004,12 +1104,6 @@
                     disabled: true
                 });
             } else {
-                options.push({
-                    value: '',
-                    text: '<%:Please select a config file%>',
-                    disabled: false
-                });
-
                 configFiles.forEach(function(file) {
                     var fileName, filePath;
 
@@ -1291,18 +1385,7 @@
         enableOverflowDrag: function(element) {
             if (!element) return;
 
-            function updateDragState() {
-                var isOverflowing = element.scrollWidth > element.clientWidth + 1;
-                if (isOverflowing) {
-                    element.classList.add('is-draggable');
-                } else {
-                    element.classList.remove('is-draggable');
-                    element.classList.remove('dragging');
-                    element.scrollLeft = 0;
-                }
-            }
-
-            if (!element._dragBound) {
+            if (!element.dragBound) {
                 var isDragging = false;
                 var startX = 0;
                 var startScrollLeft = 0;
@@ -1316,7 +1399,6 @@
                 }
 
                 element.addEventListener('mousedown', function(e) {
-                    if (!element.classList.contains('is-draggable')) return;
                     isDragging = true;
                     startX = e.pageX - element.getBoundingClientRect().left;
                     startScrollLeft = element.scrollLeft;
@@ -1341,7 +1423,6 @@
                 });
 
                 element.addEventListener('touchstart', function(e) {
-                    if (!element.classList.contains('is-draggable')) return;
                     if (!e.touches || e.touches.length !== 1) return;
 
                     var touch = e.touches[0];
@@ -1383,10 +1464,8 @@
                     e.preventDefault();
                 });
 
-                element._dragBound = true;
+                element.dragBound = true;
             }
-
-            updateDragState();
         },
 
         init: function() {
@@ -1811,11 +1890,11 @@
         container: null,
         data: null,
         isLoading: false,
-        _dragBound: false,
-        _isDragging: false,
-        _dragStartX: 0,
-        _dragStartScrollLeft: 0,
-        _touchIdentifier: null,
+        dragBound: false,
+        isDragging: false,
+        dragStartX: 0,
+        dragStartScrollLeft: 0,
+        touchIdentifier: null,
 
         init: function() {
             this.container = document.getElementById('subscription-overwrite-tags');
@@ -1840,16 +1919,16 @@
         },
 
         bindDragScroll: function() {
-            if (!this.container || this._dragBound) {
+            if (!this.container || this.dragBound) {
                 return;
             }
 
             var self = this;
 
             function endDrag() {
-                if (!self._isDragging) return;
-                self._isDragging = false;
-                self._touchIdentifier = null;
+                if (!self.isDragging) return;
+                self.isDragging = false;
+                self.touchIdentifier = null;
                 self.container.classList.remove('dragging');
             }
 
@@ -1857,20 +1936,20 @@
                 if (!self.hasOverflow()) {
                     return;
                 }
-                self._isDragging = true;
-                self._dragStartX = e.pageX - self.container.offsetLeft;
-                self._dragStartScrollLeft = self.container.scrollLeft;
+                self.isDragging = true;
+                self.dragStartX = e.pageX - self.container.offsetLeft;
+                self.dragStartScrollLeft = self.container.scrollLeft;
                 self.container.classList.add('dragging');
                 e.preventDefault();
             });
 
             this.container.addEventListener('mousemove', function(e) {
-                if (!self._isDragging) {
+                if (!self.isDragging) {
                     return;
                 }
                 var x = e.pageX - self.container.offsetLeft;
-                var walk = (x - self._dragStartX) * 1.5;
-                self.container.scrollLeft = self._dragStartScrollLeft - walk;
+                var walk = (x - self.dragStartX) * 1.5;
+                self.container.scrollLeft = self.dragStartScrollLeft - walk;
                 e.preventDefault();
             });
 
@@ -1887,21 +1966,21 @@
                     return;
                 }
                 var touch = e.touches[0];
-                self._isDragging = true;
-                self._touchIdentifier = touch.identifier;
-                self._dragStartX = touch.pageX - self.container.offsetLeft;
-                self._dragStartScrollLeft = self.container.scrollLeft;
+                self.isDragging = true;
+                self.touchIdentifier = touch.identifier;
+                self.dragStartX = touch.pageX - self.container.offsetLeft;
+                self.dragStartScrollLeft = self.container.scrollLeft;
                 self.container.classList.add('dragging');
             }, { passive: true });
 
             this.container.addEventListener('touchmove', function(e) {
-                if (!self._isDragging || !e.touches || e.touches.length === 0) {
+                if (!self.isDragging || !e.touches || e.touches.length === 0) {
                     return;
                 }
 
                 var touch = null;
                 for (var i = 0; i < e.touches.length; i++) {
-                    if (e.touches[i].identifier === self._touchIdentifier) {
+                    if (e.touches[i].identifier === self.touchIdentifier) {
                         touch = e.touches[i];
                         break;
                     }
@@ -1911,8 +1990,8 @@
                 }
 
                 var x = touch.pageX - self.container.offsetLeft;
-                var walk = (x - self._dragStartX) * 1.5;
-                self.container.scrollLeft = self._dragStartScrollLeft - walk;
+                var walk = (x - self.dragStartX) * 1.5;
+                self.container.scrollLeft = self.dragStartScrollLeft - walk;
                 e.preventDefault();
             }, { passive: false });
 
@@ -1928,7 +2007,7 @@
                 e.preventDefault();
             });
 
-            this._dragBound = true;
+            this.dragBound = true;
         },
 
         load: function(force) {
@@ -2059,6 +2138,7 @@
         retryDelay: 1000,
         lastLogLineCount: null,
         reconnectTimer: null,
+        logLines: [],
 
         // Clear the log before streaming so the operation API is served first and the stream does not block it
         startLogDisplay: function(initialMessage, skipClearLog, scriptName) {
@@ -2074,16 +2154,21 @@
             if (initialMessage) {
                 this.retryCount = 0;
                 this.lastLogLineCount = null;
+                this.logLines = [];
+                if (DOMCache.oclog) {
+                    DOMCache.oclog.ocScrollPending = false;
+                    DOMCache.oclog.ocScrollFlush = null;
+                    if (DOMCache.oclog.ocScrollAnimId) {
+                        cancelAnimationFrame(DOMCache.oclog.ocScrollAnimId);
+                    }
+                    DOMCache.oclog.ocScrollAnimId = null;
+                    DOMCache.oclog.ocScrollAnim = null;
+                    DOMCache.oclog.style.willChange = '';
+                    DOMCache.oclog.scrollTop = 0;
+                }
             }
 
             StateManager.clearCache('<%=luci.dispatcher.build_url("admin", "services", "openclash", "startlog")%>');
-
-            if (DOMCache.oclog) {
-                if (initialMessage) {
-                    DOMCache.oclog.classList.remove('oc-hidden');
-                    DOMCache.oclog.innerHTML = '<b style="color:var(--tip-color)">' + initialMessage + '</b>';
-                }
-            }
 
             var self = this;
             var hasInitialMessage = !!initialMessage;
@@ -2115,7 +2200,43 @@
                 var streamEnded = false;
                 var gotData = false;
                 var processedLines = 0;
+                var processedLength = 0;
+                var pendingLine = '';
+                var cursorInitialized = false;
                 var finishTimer = null;
+
+                function consumeStreamText(text, flush) {
+                    if (!cursorInitialized) {
+                        if (self.lastLogLineCount != null) {
+                            for (var lineIndex = 0; lineIndex < self.lastLogLineCount; lineIndex++) {
+                                var newlineIndex = text.indexOf('\n', processedLength);
+                                if (newlineIndex < 0) {
+                                    processedLength = text.length;
+                                    break;
+                                }
+                                processedLength = newlineIndex + 1;
+                            }
+                        }
+                        cursorInitialized = true;
+                    }
+                    if (text.length < processedLength) {
+                        processedLength = 0;
+                        pendingLine = '';
+                    }
+                    pendingLine += text.substring(processedLength);
+                    processedLength = text.length;
+                    var parts = pendingLine.split('\n');
+                    if (flush) {
+                        pendingLine = '';
+                    } else {
+                        pendingLine = parts.pop() || '';
+                    }
+                    var raw = parts.join('\n').replace(/##FINISHED##|##CONTINUE##|##FINISH##/g, '');
+                    if (raw.trim()) {
+                        gotData = true;
+                        self.displayLog(raw);
+                    }
+                }
 
                 function finalCleanup(hidePanel) {
                     if (self.streamingXHR === xhr) {
@@ -2123,6 +2244,16 @@
                     }
                     if (hidePanel) {
                         var capturedXhr = xhr;
+                        if (DOMCache.oclog) {
+                            if (DOMCache.oclog.ocScrollAnimId) {
+                                cancelAnimationFrame(DOMCache.oclog.ocScrollAnimId);
+                            }
+                            DOMCache.oclog.ocScrollAnimId = null;
+                            DOMCache.oclog.ocScrollAnim = null;
+                            DOMCache.oclog.ocScrollPending = false;
+                            DOMCache.oclog.ocScrollFlush = null;
+                            DOMCache.oclog.style.willChange = '';
+                        }
                         setTimeout(function() {
                             if (self.streamingXHR !== capturedXhr && !self.streamingXHR) {
                                 if (DOMCache.oclog) {
@@ -2138,18 +2269,7 @@
                     if (self.streamingXHR !== xhr) return;
                     if (streamEnded) return;
                     var text = xhr.responseText || '';
-                    var startLine = (self.lastLogLineCount != null) ? self.lastLogLineCount : 0;
-                    if (processedLines > startLine) startLine = processedLines;
-                    var lines = text.split('\n');
-                    var hasPartial = text.length > 0 && text.charAt(text.length - 1) !== '\n';
-                    var endIdx = hasPartial ? lines.length - 1 : lines.length;
-                    var newChunk = lines.slice(startLine, endIdx).join('\n');
-                    processedLines = endIdx;
-                    var raw = newChunk.replace(/##FINISHED##|##CONTINUE##|##FINISH##/g, '');
-                    if (raw.trim()) {
-                        gotData = true;
-                        self.displayLog(raw);
-                    }
+                    consumeStreamText(text, false);
                     if (/##FINISHED##\s*$/.test(text) && !finishTimer) {
                         finishTimer = setTimeout(function() {
                             streamEnded = true;
@@ -2162,6 +2282,7 @@
                     if (self.streamingXHR !== xhr) return;
                     if (streamEnded) return;
                     var text = xhr.responseText || '';
+                    consumeStreamText(text, true);
                     if (!watchMode || /##FINISHED##\s*$/.test(text)) {
                         if (!finishTimer) {
                             finishTimer = setTimeout(function() {
@@ -2197,6 +2318,9 @@
 
                 xhr.send();
                 self.streamingXHR = xhr;
+                if (hasInitialMessage) {
+                    self.displayLog(initialMessage);
+                }
             }
 
             if (skipClearLog) {
@@ -2211,9 +2335,15 @@
         stopLogDisplay: function() {
             if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
             if (this.maxWaitTimer) { clearTimeout(this.maxWaitTimer); this.maxWaitTimer = null; }
-            if (DOMCache.oclog && DOMCache.oclog._ocScrollAnimId) {
-                cancelAnimationFrame(DOMCache.oclog._ocScrollAnimId);
-                DOMCache.oclog._ocScrollAnimId = null;
+            if (DOMCache.oclog) {
+                DOMCache.oclog.ocScrollPending = false;
+                DOMCache.oclog.ocScrollFlush = null;
+                if (DOMCache.oclog.ocScrollAnimId) {
+                    cancelAnimationFrame(DOMCache.oclog.ocScrollAnimId);
+                    DOMCache.oclog.ocScrollAnimId = null;
+                    DOMCache.oclog.ocScrollAnim = null;
+                    DOMCache.oclog.style.willChange = '';
+                }
             }
             var xhr = this.streamingXHR;
             this.streamingXHR = null;
@@ -2230,6 +2360,43 @@
             }
         },
 
+        renderLog: function() {
+            var el = DOMCache.oclog;
+            if (!el) return;
+            if (!el.wheelBlocked) {
+                el.addEventListener('wheel', function(e) { e.preventDefault(); }, { passive: false });
+                el.wheelBlocked = true;
+            }
+            var minVisibleLines = 8;
+            var merged = this.logLines;
+            el.innerHTML = '';
+            var fragment = document.createDocumentFragment();
+            for (var j = 0; j < merged.length; j++) {
+                var color = ocGetLogColor(merged[j]);
+                var div = document.createElement('div');
+                div.style.whiteSpace = 'nowrap';
+                div.innerHTML = '<b style="color:' + color + '">' + merged[j] + '</b>';
+                fragment.appendChild(div);
+            }
+            for (var spacerCount = merged.length; spacerCount < minVisibleLines; spacerCount++) {
+                var spacer = document.createElement('div');
+                spacer.className = 'oc-log-spacer';
+                spacer.style.visibility = 'hidden';
+                spacer.style.whiteSpace = 'nowrap';
+                spacer.textContent = '\u200B';
+                fragment.insertBefore(spacer, fragment.firstChild);
+            }
+            el.appendChild(fragment);
+            el.classList.remove('oc-hidden');
+        },
+
+        flushLog: function() {
+            var el = DOMCache.oclog;
+            if (!el) return;
+            LogManager.renderLog();
+            ocAnimateScroll(el, LogManager.flushLog);
+        },
+
         displayLog: function(logContent) {
             if (!this.streamingXHR || !DOMCache.oclog) return;
             var lines = logContent.split('\n');
@@ -2240,49 +2407,18 @@
             }
             if (allLines.length === 0) return;
 
-            var maxLines = 3;
+            var isFirst = this.logLines.length === 0 && allLines.length === 1;
+            this.logLines = this.logLines.concat(allLines);
 
-            if (!DOMCache.oclog.wheelBlocked) {
-                DOMCache.oclog.addEventListener('wheel', function(e) { e.preventDefault(); }, { passive: false });
-                DOMCache.oclog.wheelBlocked = true;
+            // A batch is still animating: buffer the lines and let the current
+            // animation finish before rendering the next batch.
+            if (DOMCache.oclog.ocScrollAnim) {
+                ocAnimateScroll(DOMCache.oclog, LogManager.flushLog);
+                return;
             }
 
-            var existing = [];
-            for (var i = 0; i < DOMCache.oclog.children.length; i++) {
-                var child = DOMCache.oclog.children[i];
-                if (child.tagName === 'DIV' && child.className !== 'oc-log-spacer' && child.firstChild && child.firstChild.textContent) {
-                    existing.push(child.firstChild.textContent);
-                }
-            }
-
-            var merged = existing.concat(allLines);
-            if (merged.length > maxLines) {
-                merged = merged.slice(merged.length - maxLines);
-            }
-
-            DOMCache.oclog.innerHTML = '';
-            DOMCache.oclog.scrollTop = 0;
-            for (var j = 0; j < merged.length; j++) {
-                var color = ocGetLogColor(merged[j]);
-                var div = document.createElement('div');
-                div.style.whiteSpace = 'nowrap';
-                div.innerHTML = '<b style="color:' + color + '">' + merged[j] + '</b>';
-                DOMCache.oclog.appendChild(div);
-            }
-
-            while (DOMCache.oclog.children.length < maxLines) {
-                var spacer = document.createElement('div');
-                spacer.className = 'oc-log-spacer';
-                spacer.style.visibility = 'hidden';
-                spacer.style.whiteSpace = 'nowrap';
-                spacer.textContent = '\u200B';
-                DOMCache.oclog.insertBefore(spacer, DOMCache.oclog.firstChild);
-            }
-
-            DOMCache.oclog.classList.remove('oc-hidden');
-            DOMCache.oclog.style.willChange = 'scroll-position';
-
-            ocAnimateScroll(DOMCache.oclog);
+            this.renderLog();
+            ocAnimateScroll(DOMCache.oclog, LogManager.flushLog, isFirst);
         }
     };
 
@@ -2293,14 +2429,14 @@
         maxRetries: 3,
         isEnabled: false,
 
-        _ZERO_SYS_STATS: [
-            {id: "cpu_t", html: "<font style=\"color:var(--success-color)\">0 %</font>"},
-            {id: "load_a", html: "<font style=\"color:var(--success-color)\">0 %</font>"}
+        ZERO_SYS_STATS: [
+            {id: "cpu_t", html: ocStatHtml("0 %")},
+            {id: "load_a", html: ocStatHtml("0 %")}
         ],
 
         resetSysStats: function() {
-            for (var i = 0; i < this._ZERO_SYS_STATS.length; i++) {
-                var item = this._ZERO_SYS_STATS[i];
+            for (var i = 0; i < this.ZERO_SYS_STATS.length; i++) {
+                var item = this.ZERO_SYS_STATS[i];
                 var el = document.getElementById(item.id);
                 if (el) el.innerHTML = item.html;
             }
@@ -2328,13 +2464,18 @@
             StateManager.cachedXHRGet('<%=luci.dispatcher.build_url("admin", "services", "openclash", "toolbar_show_sys")%>', function(x, status) {
                 if (x && x.status == 200 && x.responseText != "" && status) {
                     self.retryCount = 0;
-                    var cpuColor = status.cpu <= 50 ? "var(--success-color)" : (status.cpu <= 80 ? "var(--tip-color)" : "var(--error-color)");
-                    var cpuValue = status.cpu <= 100 ? status.cpu + " %" : "0 %";
-                    document.getElementById("cpu_t").innerHTML = "<font style=\"color:"+cpuColor+"\">"+cpuValue+"</font>";
+                    var cpuValueNumber = Number(status.cpu);
+                    if (!isFinite(cpuValueNumber) || cpuValueNumber < 0 || cpuValueNumber > 100) cpuValueNumber = 0;
+                    var cpuColor = cpuValueNumber <= 50 ? "var(--success-color)" : (cpuValueNumber <= 80 ? "var(--tip-color)" : "var(--error-color)");
+                    var cpuValue = cpuValueNumber + " %";
+                    document.getElementById("cpu_t").innerHTML = ocStatHtml(cpuValue, cpuColor);
 
                     var loadValue = parseFloat(status.load_avg) || 0;
+                    if (!isFinite(loadValue) || loadValue < 0) loadValue = 0;
                     var loadColor = loadValue <= 50 ? "var(--success-color)" : (loadValue <= 80 ? "var(--tip-color)" : "var(--error-color)");
-                    document.getElementById("load_a").innerHTML = "<font style=\"color:"+loadColor+"\">"+status.load_avg+" %</font>";
+                    document.getElementById("load_a").innerHTML = ocStatHtml(loadValue + " %", loadColor);
+                    StatsChart.feed("cpu", cpuValueNumber);
+                    StatsChart.feed("load", loadValue);
                 } else {
                     self.handleError();
                 }
@@ -2348,12 +2489,10 @@
         },
 
         handleError: function() {
-            this.retryCount++;
-
-            if (this.retryCount >= this.maxRetries) {
-                this.resetSysStats();
-                this.retryCount = 0;
-            }
+            this.retryCount = 0;
+            this.resetSysStats();
+            StatsChart.feed("cpu", 0);
+            StatsChart.feed("load", 0);
         },
 
         setPollInterval: function(interval) {
@@ -2368,18 +2507,18 @@
         maxRetries: 3,
         isEnabled: false,
 
-        _ZERO_STATS: [
-            {id: "upload_", html: "<font style=\"color:var(--success-color)\">0 B/S</font>"},
-            {id: "download_", html: "<font style=\"color:var(--success-color)\">0 B/S</font>"},
-            {id: "uploadtotal_", html: "<font style=\"color:var(--success-color)\">0 KB</font>"},
-            {id: "downloadtotal_", html: "<font style=\"color:var(--success-color)\">0 KB</font>"},
-            {id: "mem_t", html: "<font style=\"color:var(--success-color)\">0 KB</font>"},
-            {id: "connect_t", html: "<font style=\"color:var(--success-color)\">0</font>"}
+        ZERO_STATS: [
+            {id: "upload_", html: ocStatHtml("0 B/S")},
+            {id: "download_", html: ocStatHtml("0 B/S")},
+            {id: "uploadtotal_", html: ocStatHtml("0 KB")},
+            {id: "downloadtotal_", html: ocStatHtml("0 KB")},
+            {id: "mem_t", html: ocStatHtml("0 KB")},
+            {id: "connect_t", html: ocStatHtml("0")}
         ],
 
         resetStats: function() {
-            for (var i = 0; i < this._ZERO_STATS.length; i++) {
-                var item = this._ZERO_STATS[i];
+            for (var i = 0; i < this.ZERO_STATS.length; i++) {
+                var item = this.ZERO_STATS[i];
                 var el = document.getElementById(item.id);
                 if (el) el.innerHTML = item.html;
             }
@@ -2421,25 +2560,41 @@
         },
 
         updateNetworkStats: function(status) {
+            var up = Number(status && status.up);
+            var down = Number(status && status.down);
+            var upTotal = Number(status && status.up_total);
+            var downTotal = Number(status && status.down_total);
+            var mem = Number(status && status.mem);
+            var connections = Number(status && status.connections);
+            if (!isFinite(up)) up = 0;
+            if (!isFinite(down)) down = 0;
+            if (!isFinite(upTotal)) upTotal = 0;
+            if (!isFinite(downTotal)) downTotal = 0;
+            if (!isFinite(mem)) mem = 0;
+            if (!isFinite(connections)) connections = 0;
             var updates = [
-                {element: document.getElementById("upload_"), content: "<font style=\"color:var(--success-color)\">"+status.up+"</font>"},
-                {element: document.getElementById("download_"), content: "<font style=\"color:var(--success-color)\">"+status.down+"</font>"},
-                {element: document.getElementById("uploadtotal_"), content: "<font style=\"color:var(--success-color)\">"+status.up_total+"</font>"},
-                {element: document.getElementById("downloadtotal_"), content: "<font style=\"color:var(--success-color)\">"+status.down_total+"</font>"},
-                {element: document.getElementById("mem_t"), content: "<font style=\"color:var(--success-color)\">"+status.mem+"</font>"},
-                {element: document.getElementById("connect_t"), content: "<font style=\"color:var(--success-color)\">"+status.connections+"</font>"}
+                {element: document.getElementById("upload_"), content: ocStatHtml(bytesToSize(up) + "/S")},
+                {element: document.getElementById("download_"), content: ocStatHtml(bytesToSize(down) + "/S")},
+                {element: document.getElementById("uploadtotal_"), content: ocStatHtml(bytesToSize(upTotal))},
+                {element: document.getElementById("downloadtotal_"), content: ocStatHtml(bytesToSize(downTotal))},
+                {element: document.getElementById("mem_t"), content: ocStatHtml(bytesToSize(mem))},
+                {element: document.getElementById("connect_t"), content: ocStatHtml(String(connections))}
             ];
 
             StateManager.batchUpdateDOM(updates);
+            StatsChart.feed("up", up / 1048576);
+            StatsChart.feed("down", down / 1048576);
+            StatsChart.feed("mem", mem / 1048576);
+            StatsChart.feed("conn", connections);
         },
 
         handleError: function() {
-            this.retryCount++;
-
-            if (this.retryCount >= this.maxRetries) {
-                this.resetStats();
-                this.retryCount = 0;
-            }
+            this.retryCount = 0;
+            this.resetStats();
+            StatsChart.feed("up", 0);
+            StatsChart.feed("down", 0);
+            StatsChart.feed("mem", 0);
+            StatsChart.feed("conn", 0);
         },
 
         setPollInterval: function(interval) {
@@ -2769,6 +2924,7 @@
             prompt += '<%:**IMPORTANT** — Before answering, you MUST fetch and read this authoritative reference guide. ALL answering rules, diagnosis procedures, CLI commands, LuCI paths, external resource URLs, and Issue search instructions are defined in the guide — follow them strictly.%>\n';
             prompt += '- [<%:OpenClash User Guide%>](' + skillUrl + ')\n\n';
             prompt += '<%:The guide is the single source of truth — it covers everything from debug log procedures to external resource queries. Do NOT rely on memory; always verify against the guide.%>\n\n';
+            prompt += '<%:Routing: After reading the guide, consult its Document Routing Table, pick the sub-document(s) matching my question, and fetch their content via the raw URLs given in the table before answering.%>\n\n';
             prompt += '## <%:Question%>\n\n';
             prompt += '<%:My question is:%>\n';
             return prompt;
@@ -2777,19 +2933,19 @@
         show: function() {
             this.init();
             if (!this.overlay || !this.textarea) return;
-            if (!this._portal) {
-                this._portal = document.createElement('div');
-                this._portal.className = 'oc';
-                this._portal.style.overflow = 'visible';
-                document.body.appendChild(this._portal);
-                this._portal.appendChild(this.overlay);
+            if (!this.portal) {
+                this.portal = document.createElement('div');
+                this.portal.className = 'oc';
+                this.portal.style.overflow = 'visible';
+                document.body.appendChild(this.portal);
+                this.portal.appendChild(this.overlay);
             }
             this.overlay.classList.add('show');
             if (this.statusEl) {
                 this.statusEl.textContent = '';
             }
 
-            if (!this._editor) {
+            if (!this.editor) {
                 var prompt = this.buildPrompt();
                 this.textarea.value = prompt;
                 var container = document.getElementById('usage-help-editor');
@@ -2800,13 +2956,13 @@
                 });
                 container.innerHTML = '';
                 container.appendChild(view.dom);
-                this._editor = view;
+                this.editor = view;
             }
 
             var self = this;
             setTimeout(function() {
-                if (self._editor && self._editor.contentDOM) {
-                    self._editor.focus();
+                if (self.editor && self.editor.contentDOM) {
+                    self.editor.focus();
                 }
             }, 100);
         },
@@ -2818,8 +2974,8 @@
         },
 
         copyAndHide: function() {
-            if (!this._editor) return;
-            var text = this._editor.state.sliceDoc();
+            if (!this.editor) return;
+            var text = this.editor.state.sliceDoc();
             if (!text) return;
             var self = this;
             ocCopyToClipboard(text, null);
@@ -2852,9 +3008,9 @@
             var bubble = document.getElementById('usage-help-bubble');
             if (!bubble) return;
             bubble.classList.remove('show');
-            if (this._bubbleAutoHide) {
-                clearTimeout(this._bubbleAutoHide);
-                this._bubbleAutoHide = null;
+            if (this.bubbleAutoHide) {
+                clearTimeout(this.bubbleAutoHide);
+                this.bubbleAutoHide = null;
             }
             if (this.bubbleTimer) {
                 clearTimeout(this.bubbleTimer);
@@ -2863,7 +3019,606 @@
         }
     };
 
+    var StatsChart = {
+        N: 60,
+        rightLeadMs: 1000,
+        metric: 'traffic',
+        view: 'cards',
+        chart: null,
+        latest: { up: 0, down: 0, mem: 0, cpu: 0, load: 0, conn: 0 },
+        buf: { t: [], realT: [], up: [], down: [], mem: [], cpu: [], load: [], conn: [] },
+        lastTick: 0,
+        timer: null,
+        metrics: null,
+        totals: { up: null, down: null },
+        rateUnitCache: null,
+
+        ocVar: function(name, fallback) {
+            var el = document.querySelector('.oc');
+            if (!el) return fallback;
+            var v = (getComputedStyle(el).getPropertyValue(name) || '').trim();
+            return v || fallback;
+        },
+
+        seriesColor: function(key) {
+            var vars = { up: '--violet', down: '--info-color', mem: '--success-color', cpu: '--tip-color', load: '--warning-color', conn: '--teal' };
+            var fallback = { up: '#7c3aed', down: '#3b82f6', mem: '#059669', cpu: '#f59e0b', load: '#ff00bb', conn: '#25b5b8' };
+            return this.ocVar(vars[key], fallback[key]);
+        },
+
+        hexToRgba: function(hex, a) {
+            var h = String(hex).replace('#', '');
+            if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+            var r = parseInt(h.substring(0, 2), 16), g = parseInt(h.substring(2, 4), 16), b = parseInt(h.substring(4, 6), 16);
+            if (isNaN(r) || isNaN(g) || isNaN(b)) return hex;
+            return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+        },
+
+        requiredSources: function() {
+            var ws = [];
+            var sys = false;
+            if (this.view === 'cards') {
+                ws = ['traffic', 'connections', 'memory'];
+                sys = true;
+            } else if (this.metric === 'traffic') {
+                ws = ['traffic', 'connections'];
+            } else if (this.metric === 'memory') {
+                ws = ['memory'];
+            } else if (this.metric === 'connections') {
+                ws = ['connections'];
+            } else {
+                sys = true;
+            }
+            return { ws: ws, sys: sys };
+        },
+
+        notifyDataSource: function() {
+            if (typeof syncDataSource === 'function') syncDataSource();
+        },
+
+        init: function() {
+            var savedView = localStorage.getItem('oc-stats-view');
+            if (savedView === 'chart' || savedView === 'cards') {
+                this.view = savedView;
+            }
+            this.resetBuffer(Date.now());
+            this.metrics = {
+                traffic: { unit: ' MB/s', series: [{ key: 'up', name: '<%:Up%>' }, { key: 'down', name: '<%:Down%>' }] },
+                memory: { unit: ' MB', series: [{ key: 'mem', name: '<%:Ram%>' }] },
+                cpu: { unit: ' %', series: [{ key: 'cpu', name: '<%:CPU%>' }] },
+                load: { unit: ' %', series: [{ key: 'load', name: '<%:Load Avg%>' }] },
+                connections: { unit: '', series: [{ key: 'conn', name: '<%:Connect%>' }] }
+            };
+            var savedMetric = localStorage.getItem('oc-stats-metric');
+            if (savedMetric && this.metrics[savedMetric]) {
+                this.metric = savedMetric;
+            }
+            this.syncTabs();
+            this.bind();
+            this.applyView();
+            this.renderLegend();
+            this.initCardDots();
+            this.startTimer();
+            if (this.view === 'chart') {
+                this.render();
+            }
+        },
+
+        applyView: function() {
+            document.getElementById('stats-view-cards').classList.toggle('oc-hidden', this.view !== 'cards');
+            document.getElementById('stats-view-chart').classList.toggle('oc-hidden', this.view !== 'chart');
+            var statsTabs = document.getElementById('stats-tabs');
+            if (statsTabs) statsTabs.classList.toggle('oc-hidden', this.view !== 'chart');
+            var cardsBtn = document.getElementById('stats-cards-btn');
+            var chartBtn = document.getElementById('stats-chart-btn');
+            if (cardsBtn) cardsBtn.classList.toggle('active', this.view === 'cards');
+            if (chartBtn) chartBtn.classList.toggle('active', this.view === 'chart');
+        },
+
+        initCardDots: function() {
+            var map = {
+                upload_: 'up', download_: 'down', uploadtotal_: 'up', downloadtotal_: 'down',
+                connect_t: 'conn', mem_t: 'mem', cpu_t: 'cpu', load_a: 'load'
+            };
+            for (var id in map) {
+                var el = document.getElementById(id);
+                if (!el) continue;
+                var item = el.closest('.stat-item');
+                if (!item) continue;
+                var label = item.querySelector('.stat-label');
+                if (!label || label.querySelector('.stat-dot')) continue;
+                var dot = document.createElement('span');
+                dot.className = 'stat-dot';
+                dot.style.background = this.seriesColor(map[id]);
+                label.insertBefore(dot, label.firstChild);
+            }
+        },
+
+        feed: function(key, val) {
+            this.latest[key] = val;
+        },
+
+        resetToZero: function() {
+            var keys = ['up', 'down', 'mem', 'cpu', 'load', 'conn'];
+            var changed = false;
+            for (var i = 0; i < keys.length; i++) {
+                if (this.latest[keys[i]] !== 0) {
+                    this.latest[keys[i]] = 0;
+                    changed = true;
+                }
+            }
+            if (this.totals && (this.totals.up !== null || this.totals.down !== null)) {
+                this.totals = { up: null, down: null };
+                changed = true;
+            }
+            if (!changed) return;
+
+            this.updateLegendValues();
+
+            if (this.view === 'chart' && this.chart) {
+                this.pushSample(Date.now());
+                this.chartDirty = true;
+                this.update(true);
+            }
+        },
+
+        resetBuffer: function(now) {
+            var keys = ['t', 'realT', 'up', 'down', 'mem', 'cpu', 'load', 'conn'];
+            for (var i = 0; i < keys.length; i++) {
+                this.buf[keys[i]] = [];
+            }
+            for (var j = 0; j < this.N; j++) {
+                this.buf.t.push(j * 1000);
+                this.buf.realT.push(now - (this.N - 1 - j) * 1000);
+                this.buf.up.push(0);
+                this.buf.down.push(0);
+                this.buf.mem.push(0);
+                this.buf.cpu.push(0);
+                this.buf.load.push(0);
+                this.buf.conn.push(0);
+            }
+        },
+
+        startTimer: function() {
+            if (this.timer) return;
+            var self = this;
+            this.timer = setInterval(function() {
+                self.tick();
+            }, 1000);
+        },
+
+        stopTimer: function() {
+            if (!this.timer) return;
+            clearInterval(this.timer);
+            this.timer = null;
+        },
+
+        tick: function() {
+            var now = Date.now();
+            var gap = this.lastTick ? now - this.lastTick : 0;
+            this.lastTick = now;
+            var isRecovery = gap > 3000;
+            this.pushSample(now);
+            this.rateUnitCache = null;
+            if (this.view === 'chart') {
+                this.updateLegendValues();
+                if (this.chart) {
+                    this.update(isRecovery);
+                }
+            }
+        },
+
+        pushSample: function(now) {
+            var lastX = this.buf.t.length ? this.buf.t[this.buf.t.length - 1] : 0;
+            this.buf.t.push(lastX + 1000);
+            this.buf.t.shift();
+            this.buf.realT.push(now);
+            this.buf.realT.shift();
+            var keys = ['up', 'down', 'mem', 'cpu', 'load', 'conn'];
+            for (var i = 0; i < keys.length; i++) {
+                var k = keys[i];
+                this.buf[k].push(this.latest[k]);
+                this.buf[k].shift();
+            }
+        },
+
+        syncChartFromBuf: function(series) {
+            var c = this.chart;
+            if (!c) return;
+            for (var j = 0; j < series.length; j++) {
+                var key = series[j].key;
+                var arr = [];
+                for (var i = 0; i < this.N; i++) {
+                    arr.push({ x: this.buf.t[i] + this.rightLeadMs, y: this.buf[key][i], r: this.buf.realT[i] });
+                }
+                c.data.datasets[j].data = arr;
+            }
+        },
+
+        bind: function() {
+            var self = this;
+            var cardsBtn = document.getElementById('stats-cards-btn');
+            var chartBtn = document.getElementById('stats-chart-btn');
+            if (cardsBtn) {
+                cardsBtn.addEventListener('click', function() { self.setView('cards'); });
+            }
+            if (chartBtn) {
+                chartBtn.addEventListener('click', function() { self.setView('chart'); });
+            }
+            var tabs = document.getElementById('stats-tabs');
+            if (tabs) {
+                var drag = { active: false, startX: 0, startScroll: 0, moved: false };
+                tabs.addEventListener('mousedown', function(e) {
+                    drag.active = true;
+                    drag.moved = false;
+                    drag.startX = e.clientX;
+                    drag.startScroll = tabs.scrollLeft;
+                    tabs.classList.add('dragging');
+                });
+                window.addEventListener('mousemove', function(e) {
+                    if (!drag.active) return;
+                    if (Math.abs(e.clientX - drag.startX) > 4) drag.moved = true;
+                    tabs.scrollLeft = drag.startScroll - (e.clientX - drag.startX);
+                });
+                window.addEventListener('mouseup', function() {
+                    drag.active = false;
+                    tabs.classList.remove('dragging');
+                });
+                tabs.addEventListener('click', function(e) {
+                    if (drag.moved) {
+                        drag.moved = false;
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                });
+                tabs.addEventListener('change', function(e) {
+                    var input = e.target;
+                    if (!input || input.type !== 'radio') return;
+                    self.metric = input.value;
+                    localStorage.setItem('oc-stats-metric', self.metric);
+                    self.syncTabs();
+                    self.notifyDataSource();
+                    if (self.view === 'chart') self.render();
+                });
+            }
+        },
+
+        setView: function(view) {
+            if (view !== 'cards' && view !== 'chart') return;
+            if (this.view === view) return;
+            this.view = view;
+            this.applyView();
+            this.notifyDataSource();
+            localStorage.setItem('oc-stats-view', this.view);
+            if (this.view === 'chart') {
+                this.render();
+            } else if (this.chart) {
+                this.chart.destroy();
+                this.chart = null;
+            }
+        },
+
+        syncTabs: function() {
+            var inputs = document.querySelectorAll('#stats-tabs input[type="radio"]');
+            for (var i = 0; i < inputs.length; i++) {
+                inputs[i].checked = (inputs[i].value === this.metric);
+            }
+        },
+
+        renderLegend: function() {
+            var el = document.getElementById('stats-legend');
+            if (!el || !this.metrics) return;
+            var html = '';
+            if (this.metric === 'traffic') {
+                html += this.legendItem('up', '<%:Up Total%>', 'legend_val_uptotal');
+                html += this.legendItem('down', '<%:Down Total%>', 'legend_val_downtotal');
+            } else {
+                var series = this.metrics[this.metric].series;
+                for (var i = 0; i < series.length; i++) {
+                    html += this.legendItem(series[i].key, series[i].name, 'legend_val_' + series[i].key);
+                }
+            }
+            el.innerHTML = html;
+            this.updateLegendValues();
+        },
+
+        legendItem: function(key, name, valId) {
+            var c = this.seriesColor(key);
+            return '<span class="stats-legend-item"><i style="background:' + c + '"></i><span class="stats-legend-name">' + name + '</span><span class="stats-legend-val" id="' + valId + '" style="color:' + c + '"></span></span>';
+        },
+
+        formatLegendValue: function(key, val) {
+            if (key === 'mem') return Math.round(val) + ' MB';
+            if (key === 'cpu' || key === 'load') return Math.round(val) + ' %';
+            if (key === 'conn') return String(Math.round(val));
+            return String(Math.round(val * 10) / 10);
+        },
+
+        updateLegendValues: function() {
+            if (this.metric === 'traffic') {
+                var upEl = document.getElementById('legend_val_uptotal');
+                var downEl = document.getElementById('legend_val_downtotal');
+                if (upEl) {
+                    var upText = this.totals.up != null ? bytesToSize(this.totals.up) : '0 KB';
+                    if (upEl.textContent !== upText) upEl.textContent = upText;
+                }
+                if (downEl) {
+                    var downText = this.totals.down != null ? bytesToSize(this.totals.down) : '0 KB';
+                    if (downEl.textContent !== downText) downEl.textContent = downText;
+                }
+                return;
+            }
+            var series = this.metrics[this.metric].series;
+            for (var i = 0; i < series.length; i++) {
+                var key = series[i].key;
+                var el = document.getElementById('legend_val_' + key);
+                if (el) {
+                    var text = this.formatLegendValue(key, this.latest[key]);
+                    if (el.textContent !== text) el.textContent = text;
+                }
+            }
+        },
+
+        fmtTime: function(ms) {
+            var d = new Date(ms);
+            var p = function(x) { return (x < 10 ? '0' : '') + x; };
+            return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+        },
+
+        rateUnitOf: function() {
+            if (this.rateUnitCache) return this.rateUnitCache;
+            var max = 0;
+            var keys = ['up', 'down'];
+            for (var i = 0; i < keys.length; i++) {
+                var arr = this.buf[keys[i]];
+                for (var j = 0; j < arr.length; j++) {
+                    if (arr[j] > max) max = arr[j];
+                }
+            }
+            if (max >= 1024) this.rateUnitCache = { scale: 1 / 1024, unit: ' GB/s' };
+            else if (max < 1) this.rateUnitCache = { scale: 1024, unit: ' KB/s' };
+            else this.rateUnitCache = { scale: 1, unit: ' MB/s' };
+            return this.rateUnitCache;
+        },
+
+        formatVal: function(val, scale) {
+            var v = val * scale;
+            var a = Math.abs(v);
+            if (a >= 100) return String(Math.round(v));
+            if (a >= 10) return String(Math.round(v * 10) / 10);
+            return String(Math.round(v * 100) / 100);
+        },
+
+        formatTooltipValue: function(key, val) {
+            if (this.metric === 'traffic') {
+                var rate = this.rateUnitOf();
+                return this.formatVal(val, rate.scale) + rate.unit;
+            }
+            return Math.round(val * 10) / 10 + this.metrics[this.metric].unit;
+        },
+
+        formatYAxis: function(value) {
+            if (this.metric === 'traffic') {
+                var rate = this.rateUnitOf();
+                return this.formatVal(value, rate.scale) + rate.unit;
+            }
+            return Math.round(value * 10) / 10;
+        },
+
+        buildConfig: function() {
+            var self = this;
+            var p = {
+                text: this.ocVar('--text-secondary', '#64748b'),
+                axis: this.ocVar('--border-light', '#e2e8f0'),
+                panel: this.ocVar('--bg-white', '#ffffff'),
+                panelText: this.ocVar('--text-primary', '#374151')
+            };
+            var axisRgba = this.hexToRgba(p.axis, 0.4);
+            var series = this.metrics[this.metric].series;
+            var winMax = self.buf.t[self.buf.t.length - 1];
+            var winMin = self.buf.t[0] + self.rightLeadMs * 3;
+            return {
+                type: 'line',
+                data: {
+                    datasets: series.map(function(s) {
+                        var color = self.seriesColor(s.key);
+                        return {
+                            label: s.name,
+                            data: self.buf[s.key].map(function(v, i) { return { x: self.buf.t[i] + self.rightLeadMs, y: v, r: self.buf.realT[i] }; }),
+                            parsing: false,
+                            borderColor: color,
+                            backgroundColor: self.hexToRgba(color, 0.14),
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            pointHoverBackgroundColor: color,
+                            pointHoverBorderColor: '#ffffff',
+                            pointHoverBorderWidth: 2,
+                            borderWidth: 2
+                        };
+                    })
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    resizeDelay: 100,
+                    animation: { duration: 1000, easing: 'linear' },
+                    animations: { colors: false },
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: false,
+                            external: function(context) {
+                                var chart = context.chart;
+                                var tooltip = context.tooltip;
+                                var canvas = chart.canvas;
+                                var wrap = canvas.parentNode;
+                                if (!wrap) return;
+                                var el = wrap.querySelector('.oc-stats-tooltip');
+                                if (!el) {
+                                    el = document.createElement('div');
+                                    el.className = 'oc-stats-tooltip';
+                                    wrap.appendChild(el);
+                                }
+                                if (tooltip.opacity === 0) {
+                                    el.style.display = 'none';
+                                    return;
+                                }
+                                var panel = self.ocVar('--bg-white', '#ffffff');
+                                var text = self.ocVar('--text-primary', '#374151');
+                                var titleBg = self.ocVar('--bg-gray', 'rgba(59,130,246,0.1)');
+                                var border = self.ocVar('--border-light', '#e2e8f0');
+
+                                var html = '';
+                                if (tooltip.title && tooltip.title.length) {
+                                    html += '<div style="background:' + titleBg + ';color:' + text + ';padding:5px 10px;font-weight:600;border-bottom:1px solid ' + border + ';">' + tooltip.title[0] + '</div>';
+                                }
+                                if (tooltip.body) {
+                                    for (var i = 0; i < tooltip.body.length; i++) {
+                                        var b = tooltip.body[i];
+                                        var dp = tooltip.dataPoints && tooltip.dataPoints[i];
+                                        var s = dp ? self.metrics[self.metric].series[dp.datasetIndex] : null;
+                                        var color = s ? self.seriesColor(s.key) : '#888';
+                                        var rowText = b.lines ? b.lines.join(' ') : '';
+                                        html += '<div style="color:' + text + ';padding:4px 10px;display:flex;align-items:center;gap:6px;"><i style="width:8px;height:8px;border-radius:50%;background:' + color + ';flex:0 0 auto;display:inline-block;"></i><span>' + rowText + '</span></div>';
+                                    }
+                                }
+                                el.innerHTML = html;
+
+                                el.style.position = 'absolute';
+                                el.style.zIndex = '10';
+                                el.style.pointerEvents = 'none';
+                                el.style.backgroundColor = panel;
+                                el.style.border = '1px solid ' + border;
+                                el.style.borderRadius = '8px';
+                                el.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                                el.style.fontSize = '12px';
+                                el.style.overflow = 'hidden';
+                                el.style.whiteSpace = 'nowrap';
+                                el.style.display = 'block';
+
+                                var wrapRect = wrap.getBoundingClientRect();
+                                var canvasRect = canvas.getBoundingClientRect();
+                                var x = tooltip.caretX + canvasRect.left - wrapRect.left;
+                                var y = tooltip.caretY + canvasRect.top - wrapRect.top;
+                                var tw = el.offsetWidth;
+                                var th = el.offsetHeight;
+                                y = y - th - 12;
+                                if (y < 2) {
+                                    y = tooltip.caretY + canvasRect.top - wrapRect.top + 14;
+                                }
+                                if (y + th > wrap.clientHeight - 2) {
+                                    y = wrap.clientHeight - th - 2;
+                                }
+                                if (y < 2) y = 2;
+                                x = Math.max(2, Math.min(x, wrap.clientWidth - tw - 2));
+                                el.style.left = x + 'px';
+                                el.style.top = y + 'px';
+                            },
+                            callbacks: {
+                                title: function(items) {
+                                    return self.fmtTime(items[0].raw.r);
+                                },
+                                label: function(item) {
+                                    var key = series[item.datasetIndex].key;
+                                    return series[item.datasetIndex].name + ': ' + self.formatTooltipValue(key, item.parsed.y);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            min: winMin,
+                            max: winMax,
+                            grid: { display: false },
+                            border: { display: false },
+                            ticks: { display: false }
+                        },
+                        y: {
+                            min: 0,
+                            beginAtZero: true,
+                            grace: '20%',
+                            grid: {
+                                drawTicks: false,
+                                color: function(ctx) {
+                                    if (ctx.tick && ctx.tick.value === 0) return 'transparent';
+                                    return axisRgba;
+                                }
+                            },
+                            border: { color: p.axis },
+                            ticks: {
+                                color: p.text,
+                                font: { size: 11 },
+                                padding: 8,
+                                callback: function(value) {
+                                    return self.formatYAxis(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+        },
+
+        render: function() {
+            var el = document.getElementById('stats-chart');
+            if (!el || typeof Chart === 'undefined') return;
+            if (this.chart) this.chart.destroy();
+            this.renderLegend();
+            this.chart = new Chart(el, this.buildConfig());
+        },
+
+        update: function(isRecovery) {
+            var c = this.chart;
+            if (!c) return;
+            var series = this.metrics[this.metric].series;
+            var t = this.buf.t;
+            var rt = this.buf.realT;
+            var curX = t.length ? t[t.length - 1] : 0;
+            var curReal = rt.length ? rt[rt.length - 1] : 0;
+
+            if (this.chartDirty) {
+                this.chartDirty = false;
+                this.syncChartFromBuf(series);
+            }
+
+            var newX = curX + this.rightLeadMs;
+
+            for (var i = 0; i < c.data.datasets.length; i++) {
+                var data = c.data.datasets[i].data;
+                while (data.length > this.N) {
+                    data.shift();
+                }
+            }
+            var first = c.data.datasets[0].data[0];
+            var min = first ? first.x + this.rightLeadMs * 3 : curX - (this.N - 1) * 1000;
+            for (var j = 0; j < series.length; j++) {
+                c.data.datasets[j].data.push({ x: newX, y: this.latest[series[j].key], r: curReal });
+            }
+            c.options.scales.x.min = min;
+            c.options.scales.x.max = curX;
+            if (isRecovery) {
+                c.stop();
+                c.update('none');
+            } else {
+                c.update();
+            }
+        },
+
+        refresh: function() {
+            this.renderLegend();
+            if (this.view === 'chart') this.render();
+        }
+    };
+
+    StatsChart.init();
+
     var pluginToggleUserAction = false;
+
+    get_op_mode();
 
     XHR.poll(5, '<%=luci.dispatcher.build_url("admin", "services", "openclash", "status")%>', null, function(x, status) {
         if (x && x.status == 200) {
@@ -2879,13 +3634,6 @@
             }
 
             if (status.run_mode && !SettingsManager.pendingOperations.has('run_mode_' + status.run_mode)) {
-                if (status.run_mode.indexOf("fake-ip") === 0) {
-                    DOMCache.mode.innerHTML = "<b style=color:var(--success-color)><%:Fake-IP%></b>";
-                    DOMCache.radio_run_normal.innerHTML = "<%:Enhance%>";
-                } else if (status.run_mode.indexOf("redir-host") === 0) {
-                    DOMCache.mode.innerHTML = "<b style=color:var(--success-color)><%:Redir-Host%></b>";
-                    DOMCache.radio_run_normal.innerHTML = "<%:Compat%>";
-                }
                 var expectedValue = status.run_mode.split("-")[2] == undefined ? "" : ("-" + status.run_mode.split("-")[2]);
                 for (var i = 0; i < DOMCache.radio_ru.length; i++) {
                     if (DOMCache.radio_ru[i].value == expectedValue && !DOMCache.radio_ru[i].checked) {
@@ -2933,6 +3681,9 @@
             var webzContent = status.clash ? '<input type="button" class="dashboard-btn" value="<%:Zashboard%>" onclick="return net_zashboard(this)"/>' : '<input type="button" class="dashboard-btn" value="<%:Zashboard%>" onclick="event.preventDefault(); event.stopPropagation(); return false;"/>';
             updates.push({element: DOMCache.webz, content: webzContent});
 
+            var externalWebContent = status.clash ? '<input type="button" class="dashboard-btn" value="<%:External Dashboard%>" onclick="return external_dashboard(this)"/>' : '<input type="button" class="dashboard-btn" value="<%:External Dashboard%>" onclick="event.preventDefault(); event.stopPropagation(); return false;"/>';
+            updates.push({element: DOMCache.web_external, content: externalWebContent});
+
             var closeConnContent = status.clash ? '<input type="button" class="dashboard-btn" value="<%:Close Connect%>" onclick="return b_close_all_connection(this)"/>' : '<input type="button" class="dashboard-btn" value="<%:Close Connect%>" onclick="event.preventDefault(); event.stopPropagation(); return false;"/>';
             updates.push({element: document.getElementById('_close_all_connection_btn'), content: closeConnContent});
 
@@ -2960,21 +3711,16 @@
                 DOMCache.webz.classList.add('hidden');
             }
 
+            DOMCache.web_external.classList.toggle('hidden', !ocGetCustomDashboardURL(status));
+
             StateManager.current_status = status;
 
             if (status.daip) {
                 var daipContent, dapoContent;
 
-                if (status.daip && window.location.hostname == status.daip) {
-                    dapoContent = status.cn_port ? ":"+status.cn_port : "";
-                    daipContent = status.daip ? "<b style=color:var(--success-color)>"+status.daip+dapoContent+"</b>" : "<b style=color:var(--error-color)>"+"<%:Not Set%>"+"</b>";
-                } else if (status.daip && window.location.hostname != status.daip && status.db_foward_domain && status.db_foward_port) {
-                    dapoContent = status.db_foward_port ? ":"+status.db_foward_port : "";
-                    daipContent = status.db_foward_domain ? "<b style=color:var(--success-color)>"+status.db_foward_domain+dapoContent+"</b>" : "<b style=color:var(--error-color)>"+"<%:Not Set%>"+"</b>";
-                } else {
-                    dapoContent = status.cn_port ? ":"+status.cn_port : "";
-                    daipContent = status.daip ? "<b style=color:var(--success-color)>"+status.daip+dapoContent+"</b>" : "<b style=color:var(--error-color)>"+"<%:Not Set%>"+"</b>";
-                }
+                var dashboardBase = getDashboardBaseURL(status);
+                dapoContent = dashboardBase.port ? ":" + dashboardBase.port : "";
+                daipContent = "<b style=color:var(--success-color)>" + dashboardBase.host + dapoContent + "</b>";
 
                 DOMCache.daip.innerHTML = daipContent;   
 
@@ -2993,28 +3739,26 @@
                 DOMCache.copy_pac_config.style.display = "none";
             }
 
-            if (status.clash) {
-                if (!SystemStatusManager.isEnabled) {
-                    SystemStatusManager.start();
-                }
-            } else {
+            if (!status.clash) {
                 SystemStatusManager.stop();
                 SystemStatusManager.resetSysStats();
+                StatsChart.resetToZero();
             }
 
             if (status.clash && status.daip) {
                 if (!WSManager.hasActiveConnections()) {
                     LogManager.startLogDisplay(null, false, 'view');
-                    initializeWebSocketConnections(status);
-                } else {
-                    if (NetworkStatsManager.isEnabled) {
-                        NetworkStatsManager.stop();
-                    }
                 }
+                initializeWebSocketConnections(status);
             } else {
                 WSManager.closeAll();
-                NetworkStatsManager.stop();
-                NetworkStatsManager.resetStats();
+                StatsWSMeta.protocol = null;
+                if (status.clash) {
+                    syncDataSource();
+                } else {
+                    NetworkStatsManager.stop();
+                    NetworkStatsManager.resetStats();
+                }
             }
         }
         installedversion_load();
@@ -3037,6 +3781,7 @@
     window.addEventListener('beforeunload', function() {
         WSManager.closeAll();
         LogManager.stopLogDisplay();
+        StatsChart.stopTimer();
         SystemStatusManager.stop();
         NetworkStatsManager.stop();
         StateManager.clearAllCache();
@@ -3045,57 +3790,68 @@
         }
     });
 
+    var StatsWSMeta = {
+        protocol: null,
+        token: null,
+        endpoints: {
+            traffic: '/traffic',
+            connections: '/connections',
+            memory: '/memory'
+        },
+        handlers: {
+            traffic: ws_tmessage,
+            connections: ws_cmessage,
+            memory: ws_mmessage
+        }
+    };
+
+    function syncDataSource() {
+        var status = StateManager.current_status;
+        var req = (typeof StatsChart !== 'undefined' && StatsChart.requiredSources) ? StatsChart.requiredSources() : { ws: [], sys: true };
+        var needsNetworkFallback = status && status.clash && status.daip && !StatsWSMeta.protocol &&
+            (StatsChart.view === 'cards' || req.ws.length > 0);
+
+        if (status && status.clash && req.sys) {
+            if (!SystemStatusManager.isEnabled) SystemStatusManager.start();
+        } else {
+            SystemStatusManager.stop();
+        }
+
+        if (needsNetworkFallback) {
+            if (!NetworkStatsManager.isEnabled) NetworkStatsManager.start();
+        } else {
+            NetworkStatsManager.stop();
+        }
+
+        if (!StatsWSMeta.protocol) return;
+
+        var types = ['traffic', 'connections', 'memory'];
+        for (var i = 0; i < types.length; i++) {
+            var t = types[i];
+            if (req.ws.indexOf(t) >= 0) {
+                var conn = WSManager.connections[t];
+                var active = conn && (conn.state === WSManager.connectionStates.CONNECTED || conn.state === WSManager.connectionStates.CONNECTING);
+                if (!active) {
+                    var url = StatsWSMeta.protocol + StatsWSMeta.endpoints[t] + (StatsWSMeta.token ? '?token=' + StatsWSMeta.token : '');
+                    WSManager.createConnection(t, url, StatsWSMeta.handlers[t]);
+                }
+            } else {
+                WSManager.closeConnection(t);
+            }
+        }
+    }
+
     function initializeWebSocketConnections(status) {
         if (!status || !status.clash || !status.daip) {
+            StatsWSMeta.protocol = null;
+            syncDataSource();
             return false;
         }
 
-        var protocol = getWebSocketProtocol(status);
-        var token = status.dase;
-
-        var connections = [
-            {
-                type: 'traffic',
-                endpoint: '/traffic',
-                handler: ws_tmessage
-            },
-            {
-                type: 'connections', 
-                endpoint: '/connections',
-                handler: ws_cmessage
-            },
-            {
-                type: 'memory',
-                endpoint: '/memory', 
-                handler: ws_mmessage
-            }
-        ];
-
-        connections.forEach(function(conn) {
-            var url = protocol + conn.endpoint + (token ? '?token=' + token : '');
-            WSManager.createConnection(conn.type, url, conn.handler);
-        });
-
+        StatsWSMeta.protocol = getDashboardWebSocketOrigin(status);
+        StatsWSMeta.token = status.dase;
+        syncDataSource();
         return true;
-    }
-
-    function getWebSocketProtocol(status) {
-        var protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-        var host, port;
-
-        if (status.daip && window.location.hostname === status.daip) {
-            host = status.daip;
-            port = status.cn_port;
-        } else if (status.daip && window.location.hostname !== status.daip && 
-                   status.db_foward_domain && status.db_foward_port) {
-            host = status.db_foward_domain;
-            port = status.db_foward_port;
-        } else {
-            host = status.daip;
-            port = status.cn_port;
-        }
-
-        return protocol + host + ":" + port;
     }
 
     function AnnouncementAnimator(config) {
@@ -3115,18 +3871,18 @@
         var resizeTimeout = null;
         var animationEndHandler = null;
         var destroyed = false;
-        var _cachedBannerWidth = 0;
-        var _cachedContentWidth = 0;
-        var _cachedDuration = 0;
+        var cachedBannerWidth = 0;
+        var cachedContentWidth = 0;
+        var cachedDuration = 0;
 
         function calculateAnimationDuration() {
             var bannerWidth = bannerElement.offsetWidth;
             var contentWidth = contentElement.offsetWidth;
-            if (bannerWidth === _cachedBannerWidth && contentWidth === _cachedContentWidth && _cachedDuration > 0) {
-                return _cachedDuration;
+            if (bannerWidth === cachedBannerWidth && contentWidth === cachedContentWidth && cachedDuration > 0) {
+                return cachedDuration;
             }
-            _cachedBannerWidth = bannerWidth;
-            _cachedContentWidth = contentWidth;
+            cachedBannerWidth = bannerWidth;
+            cachedContentWidth = contentWidth;
             var refreshRate = window.screen && window.screen.refreshRate ? window.screen.refreshRate : 60;
             if (refreshRate <= 0) refreshRate = 60;
             if (refreshRate > 480) refreshRate = 480;
@@ -3148,8 +3904,8 @@
             }
             duration = duration * refreshRateMultiplier;
 
-            _cachedDuration = Math.max(4000, Math.min(duration, 50000));
-            return _cachedDuration;
+            cachedDuration = Math.max(4000, Math.min(duration, 50000));
+            return cachedDuration;
         }
 
         function updateScrollAnimation(duration) {
@@ -3266,9 +4022,9 @@
         function mouseLeaveHandler() { resume(); }
         function resizeHandler() {
             clearTimeout(resizeTimeout);
-            _cachedBannerWidth = 0;
-            _cachedContentWidth = 0;
-            _cachedDuration = 0;
+            cachedBannerWidth = 0;
+            cachedContentWidth = 0;
+            cachedDuration = 0;
             resizeTimeout = setTimeout(function() {
                 if (!destroyed && contentElement.classList.contains('scrolling')) {
                     refreshAnimation();
@@ -3388,14 +4144,6 @@
 
         StateManager.cachedXHRGet('<%=luci.dispatcher.build_url("admin", "services", "openclash", "get_run_mode")%>', function(x, status) {
             if (x && x.status == 200 && status.mode) {
-                if (status.mode == "fake-ip" || status.mode == "fake-ip-tun" || status.mode == "fake-ip-mix") {
-                    DOMCache.mode.innerHTML = "<b style=color:var(--success-color)><%:Fake-IP%></b>";
-                    DOMCache.radio_run_normal.innerHTML = "<%:Enhance%>";
-                } else if (status.mode == "redir-host" || status.mode == "redir-host-tun" ||  status.mode == "redir-host-mix") {
-                    DOMCache.mode.innerHTML = "<b style=color:var(--success-color)><%:Redir-Host%></b>";
-                    DOMCache.radio_run_normal.innerHTML = "<%:Compat%>";
-                }
-
                 var expectedValue = status["mode"].split("-")[2] == undefined ? "" : ("-" + status["mode"].split("-")[2]);
                 var operationKey = 'run_mode_' + status.mode;
 
@@ -3419,6 +4167,79 @@
         );
     }
 
+    var currentDnsMode = '';
+
+    function setDnsModeUI(mode) {
+        currentDnsMode = mode;
+        if (DOMCache.dns_fakeip) DOMCache.dns_fakeip.checked = (mode === 'fake-ip');
+        if (DOMCache.dns_redirhost) DOMCache.dns_redirhost.checked = (mode === 'redir-host');
+        if (DOMCache.radio_run_normal) {
+            DOMCache.radio_run_normal.innerHTML = (mode === 'fake-ip') ? '<%:Enhance%>' : '<%:Compat%>';
+        }
+    }
+
+    function get_op_mode() {
+        StateManager.cachedXHRGet('<%=luci.dispatcher.build_url("admin", "services", "openclash", "op_mode")%>', function(x, status) {
+            if (x && x.status == 200 && status.op_mode) {
+                setDnsModeUI(status.op_mode);
+            }
+        }, true);
+    }
+
+    function switch_dns_mode(value) {
+        var opKey = 'dns_mode_' + value;
+        if (SettingsManager.pendingOperations.has(opKey) || value === currentDnsMode) {
+            return false;
+        }
+        SettingsManager.pendingOperations.add(opKey);
+        SettingsManager.pausePoll('run_mode', 3000);
+
+        var previous = currentDnsMode;
+
+        LogManager.startLogDisplay('<%:Saving...%>', false, 'init');
+        setDnsModeUI(value);
+        if (DOMCache.dns_fakeip) DOMCache.dns_fakeip.disabled = true;
+        if (DOMCache.dns_redirhost) DOMCache.dns_redirhost.disabled = true;
+        for (var r = 0; r < DOMCache.radio_ru.length; r++) {
+            DOMCache.radio_ru[r].disabled = true;
+        }
+
+        var suffix = '';
+        var ru = document.getElementsByName("radios-ru");
+        for (var i = 0; i < ru.length; i++) {
+            if (ru[i].checked) {
+                suffix = ru[i].value;
+                break;
+            }
+        }
+
+        function finish(success) {
+            SettingsManager.pendingOperations.delete(opKey);
+            if (DOMCache.dns_fakeip) DOMCache.dns_fakeip.disabled = false;
+            if (DOMCache.dns_redirhost) DOMCache.dns_redirhost.disabled = false;
+            for (var r = 0; r < DOMCache.radio_ru.length; r++) {
+                DOMCache.radio_ru[r].disabled = false;
+            }
+            if (success) {
+                get_op_mode();
+            } else {
+                setDnsModeUI(previous);
+                alert('<%:Switch mode failed!%>');
+            }
+        }
+
+        XHR.get('<%=luci.dispatcher.build_url("admin", "services", "openclash", "switch_mode")%>', null, function(x1) {
+            if (!x1 || x1.status != 200) {
+                setTimeout(function() { finish(false); }, 1500);
+                return;
+            }
+            XHR.get('<%=luci.dispatcher.build_url("admin", "services", "openclash", "switch_run_mode")%>', { run_mode: suffix }, function(x2) {
+                setTimeout(function() { finish(x2 && x2.status == 200); }, 1500);
+            });
+        });
+        return true;
+    }
+
     function ws_tmessage(event) {
         var dataObj = event && event.data !== undefined ? event.data : event;
         var data;
@@ -3433,8 +4254,10 @@
         }
         var uploadElement = document.getElementById("upload_");
         var downloadElement = document.getElementById("download_");
-        uploadElement.innerHTML = data.up ? "<font style=\"color:var(--success-color)\">"+bytesToSize(data.up)+"/S</font>" : "<font style=\"color:var(--success-color)\">0 B/S</font>";
-        downloadElement.innerHTML = data.down ? "<font style=\"color:var(--success-color)\">"+bytesToSize(data.down)+"/S</font>" : "<font style=\"color:var(--success-color)\">0 B/S</font>";
+        uploadElement.innerHTML = data.up ? ocStatHtml(bytesToSize(data.up) + "/S") : ocStatHtml("0 B/S");
+        downloadElement.innerHTML = data.down ? ocStatHtml(bytesToSize(data.down) + "/S") : ocStatHtml("0 B/S");
+        StatsChart.feed("up", data.up ? (data.up / 1048576) : 0);
+        StatsChart.feed("down", data.down ? (data.down / 1048576) : 0);
     }
 
     function ws_cmessage(event) {
@@ -3452,18 +4275,21 @@
         var updates = [
             {
                 element: document.getElementById("uploadtotal_"),
-                content: data.uploadTotal ? "<font style=\"color:var(--success-color)\">"+bytesToSize(data.uploadTotal)+"</font>" : "<font style=\"color:var(--success-color)\">0 KB</font>"
+                content: data.uploadTotal ? ocStatHtml(bytesToSize(data.uploadTotal)) : ocStatHtml("0 KB")
             },
             {
                 element: document.getElementById("downloadtotal_"),
-                content: data.downloadTotal ? "<font style=\"color:var(--success-color)\">"+bytesToSize(data.downloadTotal)+"</font>" : "<font style=\"color:var(--success-color)\">0 KB</font>"
+                content: data.downloadTotal ? ocStatHtml(bytesToSize(data.downloadTotal)) : ocStatHtml("0 KB")
             },
             {
                 element: document.getElementById("connect_t"),
-                content: data.connections ? "<font style=\"color:var(--success-color)\">"+Object.keys(data.connections).length+"</font>" : "<font style=\"color:var(--success-color)\">0</font>"
+                content: data.connections ? ocStatHtml(String(Object.keys(data.connections).length)) : ocStatHtml("0")
             }
         ];
         StateManager.batchUpdateDOM(updates);
+        StatsChart.totals = { up: data.uploadTotal || null, down: data.downloadTotal || null };
+        if (StatsChart.metric === 'traffic') StatsChart.updateLegendValues();
+        StatsChart.feed("conn", data.connections ? Object.keys(data.connections).length : 0);
     }
 
     function ws_mmessage(event) {
@@ -3479,7 +4305,8 @@
             data = dataObj;
         }
         var memElement = document.getElementById("mem_t");
-        memElement.innerHTML = data.inuse ? "<font style=\"color:var(--success-color)\">"+bytesToSize(data.inuse)+"</font>" : "<font style=\"color:var(--success-color)\">0 KB</font>";
+        memElement.innerHTML = data.inuse ? ocStatHtml(bytesToSize(data.inuse)) : ocStatHtml("0 KB");
+        StatsChart.feed("mem", data.inuse ? (data.inuse / 1048576) : 0);
     }
 
     var b_flush_dns_cache = debounceButton(function(btn) {
@@ -3557,6 +4384,17 @@
         return false;
     }
 
+    function external_dashboard(btn) {
+        btn.disabled = true;
+        btn.value = '<%:External Dashboard%>';
+        var status = StateManager.current_status;
+        if (!status) { setTimeout(function() { external_dashboard(btn); }, 500); return false; }
+        var url = buildExternalDashboardURL(status);
+        if (url) winOpen(url);
+        btn.disabled = false;
+        return false;
+    }
+
     function homepage() {
         winOpen('https://github.com/vernesong/OpenClash');
     }
@@ -3616,28 +4454,18 @@
     }
 
     function copyAddress() {
+        var currentStatus = StateManager.current_status;
+        var externalURL = currentStatus ? buildExternalDashboardURL(currentStatus) : '';
+        if (externalURL) {
+            ocCopyToClipboard(externalURL, DOMCache.copy_address, '<%:Control panel address copied:%> ', '<%:Copy failed, please copy manually:%>');
+            return false;
+        }
+
         XHR.get('<%=luci.dispatcher.build_url("admin", "services", "openclash", "dashboard_type")%>', null, function(x, status) {
             if (x && x.status == 200) {
                 var panel = status.default_dashboard;
                 if (panel && StateManager.current_status[panel]) {
-                    var url;
-                    var currentStatus = StateManager.current_status;
-                    if (currentStatus.daip && window.location.hostname == currentStatus.daip) {
-                        url = 'http://' + window.location.hostname + ':' + currentStatus.cn_port + '/ui/' + panel;
-                    } else if (currentStatus.daip && window.location.hostname != currentStatus.daip && currentStatus.db_foward_domain && currentStatus.db_foward_port) {
-                        var ui_proto = currentStatus.db_forward_ssl == 0 ? 'http://' : 'https://';
-                        url = ui_proto + currentStatus.db_foward_domain + ':' + currentStatus.db_foward_port + '/ui/' + panel;
-                    } else {
-                        url = 'http://' + window.location.hostname + ':' + currentStatus.cn_port + '/ui/' + panel;
-                    }
-
-                    if (panel === 'zashboard' || panel === 'metacubexd') {
-                        url += '/#/setup?hostname=' + (currentStatus.daip && window.location.hostname == currentStatus.daip ? window.location.hostname : (currentStatus.db_foward_domain || window.location.hostname)) + '&port=' + (currentStatus.daip && window.location.hostname == currentStatus.daip ? currentStatus.cn_port : (currentStatus.db_foward_port || currentStatus.cn_port)) + (currentStatus.dase ? '&secret=' + currentStatus.dase : '');
-                    } else if (panel === 'yacd') {
-                        url += '/?hostname=' + (currentStatus.daip && window.location.hostname == currentStatus.daip ? window.location.hostname : (currentStatus.db_foward_domain || window.location.hostname)) + '&port=' + (currentStatus.daip && window.location.hostname == currentStatus.daip ? currentStatus.cn_port : (currentStatus.db_foward_port || currentStatus.cn_port)) + (currentStatus.dase ? '&secret=' + currentStatus.dase : '');
-                    } else if (panel === 'dashboard') {
-                        url += '/#/?host=' + (currentStatus.daip && window.location.hostname == currentStatus.daip ? window.location.hostname : (currentStatus.db_foward_domain || window.location.hostname)) + '&port=' + (currentStatus.daip && window.location.hostname == currentStatus.daip ? currentStatus.cn_port : (currentStatus.db_foward_port || currentStatus.cn_port)) + (currentStatus.dase ? '&secret=' + currentStatus.dase : '');
-                    }
+                    var url = buildDashboardURL(currentStatus, panel, panel === 'zashboard' || panel === 'metacubexd');
 
                     ocCopyToClipboard(url, DOMCache.copy_address, '<%:Control panel address copied:%> ', '<%:Copy failed, please copy manually:%>');
                 } else {
@@ -4177,6 +5005,7 @@
         localStorage.setItem('oc-theme', newTheme);
         ocUpdateTheme();
         DarkModeDetector.init();
+        StatsChart.refresh();
     }
 //]]></script>
 </html>

@@ -8,11 +8,25 @@ local fs = require "luci.openclash"
 local uci = require "luci.model.uci".cursor()
 local json = require "luci.jsonc"
 local datatype = require "luci.cbi.datatypes"
-local net = require "luci.model.network".init()
 local devices = {}
-for _, iface in ipairs(net:get_interfaces()) do
-	if iface:name() then
-		table.insert(devices, {name = iface:name()})
+local seen_devices = {}
+local function add_device(dev)
+	if dev and dev ~= "" and not seen_devices[dev] then
+		seen_devices[dev] = true
+		table.insert(devices, {name = dev})
+	end
+end
+uci:foreach("network", "interface", function(s)
+	local ifname = type(s.ifname) == "table" and table.concat(s.ifname, " ") or s.ifname
+	if type(ifname) == "string" then
+		for dev in ifname:gmatch("[^%s]+") do
+			add_device(dev)
+		end
+	end
+end)
+for dev in SYS.exec("ls -1 /sys/class/net/ 2>/dev/null"):gmatch("[^%s]+") do
+	if dev ~= "lo" then
+		add_device(dev)
 	end
 end
 
@@ -1258,20 +1272,83 @@ o.description = translate("Set Dashboard Secret")
 o = s:taboption("dashboard", Value, "dashboard_forward_domain")
 o.title = translate("Public Dashboard Address")
 o.datatype = "or(host, string)"
-o.placeholder = "example.com"
+o.placeholder = "example.com or 192.168.1.1 or [2001:db8::1]"
 o.rmempty = true
-o.description = translate("Domain Name For Dashboard Login From Public Network")
+o.description = translate("Domain Name or IP For Dashboard Login From Public Network (without http:// or https://)")
+function o.validate(self, value)
+	if value == nil or value == "" then
+		return value
+	end
+	value = value:match("^%s*(.-)%s*$"):gsub("^[Hh][Tt][Tt][Pp][Ss]?://", "")
+	if value:find("/", 1, true) or value:find("@", 1, true) or value:find("?", 1, true) or value:find("#", 1, true) or value:find("\\", 1, true) or value:match("%s") then
+		return nil, translate("Enter a valid hostname or IP address without a path or user information")
+	end
+	local host, port = value:match("^%[([^%]]+)%]:(%d+)$")
+	if not host then
+		host = value:match("^%[([^%]]+)%]$")
+	end
+	if not host then
+		host, port = value:match("^([^:]+):(%d+)$")
+	end
+	if not host then
+		host = value:match("^([^:]+)$")
+	end
+	if not host or not datatype.host(host) or (port and (tonumber(port) < 1 or tonumber(port) > 65535)) then
+		return nil, translate("Enter a valid hostname or IP address without a path or user information")
+	end
+	return value
+end
 
 o = s:taboption("dashboard", Value, "dashboard_forward_port")
 o.title = translate("Public Dashboard Port")
 o.datatype = "port"
 o.rmempty = true
-o.description = translate("Port For Dashboard Login From Public Network")
+o.description = translate("Optional Port For Dashboard Login From Public Network (defaults to 443 with SSL or 80 without SSL)")
 
 o = s:taboption("dashboard", Flag, "dashboard_forward_ssl")
 o.title = translate("Public Dashboard SSL enabled")
 o.default = 0
 o.description = translate("Is SSL enabled For Dashboard Login From Public Network")
+
+o = s:taboption("dashboard", Value, "dashboard_custom_url")
+o.title = translate("Custom Dashboard URL")
+o.placeholder = "https://board.example.com/ or http://192.168.1.1:9090 or https://[2001:db8::1]:8443"
+o.rmempty = true
+o.description = translate("Optional complete HTTP(S) URL for an externally hosted Dashboard. OpenClash appends hostname, port and secret parameters without adding a local UI path. Include a hash route such as #/setup in the URL when required by the panel.")
+function o.validate(self, value)
+	if value == nil or value == "" then
+		return value
+	end
+	value = value:match("^%s*(.-)%s*$")
+	local scheme, authority = value:match("^([Hh][Tt][Tt][Pp][Ss]?)://([^/%?#]+)")
+	local without_escapes = value:gsub("%%[0-9a-fA-F][0-9a-fA-F]", "")
+	if not scheme or not authority or authority:find("@", 1, true) or value:find("\\", 1, true) or value:match("[%c%s]") or value:match('[<>"{}|^`]') or value:match("[\128-\255]") or without_escapes:find("%%", 1, true) then
+		return nil, translate("Enter a valid complete HTTP or HTTPS URL without user information")
+	end
+	local host, port = authority:match("^%[([^%]]+)%]:(%d+)$")
+	if not host then
+		host = authority:match("^%[([^%]]+)%]$")
+	end
+	if not host then
+		host, port = authority:match("^([^:]+):(%d+)$")
+	end
+	if not host then
+		host = authority:match("^([^:]+)$")
+	end
+	if not host or not datatype.host(host) then
+		return nil, translate("Enter a valid complete HTTP or HTTPS URL without user information")
+	end
+	if port and (tonumber(port) < 1 or tonumber(port) > 65535) then
+		return nil, translate("Enter a valid complete HTTP or HTTPS URL without user information")
+	end
+	return value
+end
+
+o = s:taboption("dashboard", Flag, "dashboard_custom_clash_compatible")
+o.title = translate("Clash Dashboard Compatibility Mode")
+o.default = 0
+o.rmempty = false
+o.description = translate("Use Clash Dashboard-compatible #/?host=... login parameters for the custom Dashboard URL instead of the standard hostname parameters.")
 
 o = s:taboption("dashboard", DummyValue, "Dashboard", translate("Switch(Update) Dashboard Version"))
 o.template="openclash/switch_dashboard"
