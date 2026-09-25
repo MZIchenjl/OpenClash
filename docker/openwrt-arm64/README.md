@@ -26,6 +26,36 @@ docker compose up -d
 ./smoke-test.sh
 ```
 
+## 打包 NanoPi R5S APK
+
+以下命令使用官方 OpenWrt 25.12.5 `rockchip/armv8` SDK。SDK 必须放在 Docker
+命名卷中，避免 macOS 默认文件系统的大小写不敏感问题。宿主机需要 `zstd`。
+
+```sh
+cd ~/Projects/OpenClash
+mkdir -p docker/openwrt-arm64/.cache/sdk-25.12.5
+curl -fL --retry 3 \
+  https://downloads.openwrt.org/releases/25.12.5/targets/rockchip/armv8/openwrt-sdk-25.12.5-rockchip-armv8_gcc-14.3.0_musl.Linux-x86_64.tar.zst \
+  -o docker/openwrt-arm64/.cache/sdk-25.12.5/openwrt-sdk.tar.zst
+printf '%s\n' '59194a023968398af64bfa7d8bc3eac322641f6dc9cdbade28a4d9dd41866eba  docker/openwrt-arm64/.cache/sdk-25.12.5/openwrt-sdk.tar.zst' | shasum -a 256 -c -
+docker build --platform linux/amd64 \
+  -f docker/openwrt-arm64/Dockerfile.sdk-builder \
+  -t openclash-sdk-builder:bookworm docker/openwrt-arm64
+docker volume create openclash-sdk-25-12-5
+zstd -dc docker/openwrt-arm64/.cache/sdk-25.12.5/openwrt-sdk.tar.zst | \
+  docker run --rm --platform linux/amd64 -i \
+    -v openclash-sdk-25-12-5:/sdk openclash-sdk-builder:bookworm \
+    tar -xf - -C /sdk --strip-components=1
+docker run --rm --platform linux/amd64 \
+  -v openclash-sdk-25-12-5:/sdk -w /sdk \
+  openclash-sdk-builder:bookworm make defconfig
+./docker/openwrt-arm64/package-bundled-apk.sh
+```
+
+产物位于 `dist/openclash-arm64-x365-v5/`，包含固定提交的 x365 Mihomo。
+这套 APK 仅适用于使用 `apk` 包管理器且架构为 `aarch64_generic` 的
+OpenWrt 25.12.5 R5S 固件。
+
 脚本首次运行会生成 `.secrets/root_password`，权限为 `0600`，且已被 Git
 忽略。LuCI 用户名为 `root`，密码就是该文件的内容。
 Docker 环境默认把 LuCI 语言设置为中文，可通过

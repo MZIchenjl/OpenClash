@@ -3,7 +3,7 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
-SDK_ROOT=${OPENWRT_SDK_ROOT:-$SCRIPT_DIR/.cache/sdk-25.12.5/root}
+SDK_VOLUME=${OPENWRT_SDK_VOLUME:-openclash-sdk-25-12-5}
 BUILDER_IMAGE=${OPENCLASH_SDK_BUILDER:-openclash-sdk-builder:bookworm}
 BUILD_INFO=$REPO_ROOT/luci-app-openclash/root/usr/share/openclash/build-info
 PACKAGE_SOURCE=$REPO_ROOT/luci-app-openclash
@@ -55,26 +55,24 @@ EXPECTED_MIHOMO_BUILD_ID="alpha-g$(printf '%s' "$PINNED_COMMIT" | cut -c1-8)-x36
 	echo "X365_REVISION must match PKG_RELEASE (expected v$PACKAGE_RELEASE)." >&2
 	exit 1
 }
-[ -f "$SDK_ROOT/rules.mk" ] && [ -x "$SDK_ROOT/staging_dir/host/bin/apk" ] || {
-	echo "OpenWrt 25.12.5 rockchip/armv8 SDK not found: $SDK_ROOT" >&2
-	exit 1
-}
-grep -q 'CONFIG_TARGET_ARCH_PACKAGES="aarch64_generic"' "$SDK_ROOT/.config" || {
-	echo "The SDK is not configured for aarch64_generic." >&2
-	exit 1
-}
 docker image inspect "$BUILDER_IMAGE" >/dev/null 2>&1 || {
 	docker build --platform linux/amd64 \
 		-f "$SCRIPT_DIR/Dockerfile.sdk-builder" \
 		-t "$BUILDER_IMAGE" "$SCRIPT_DIR"
 }
+docker run --rm --platform linux/amd64 \
+	-v "$SDK_VOLUME:/sdk:ro" "$BUILDER_IMAGE" sh -ec '
+		test -f /sdk/rules.mk
+		test -x /sdk/staging_dir/host/bin/apk
+		grep -q '\''CONFIG_TARGET_ARCH_PACKAGES="aarch64_generic"'\'' /sdk/.config
+	' || {
+	echo "OpenWrt 25.12.5 rockchip/armv8 SDK is missing or not configured in Docker volume: $SDK_VOLUME" >&2
+	exit 1
+}
 
 OUTPUT_DIR=$REPO_ROOT/dist/openclash-arm64-x365-${X365_REVISION}
 CORE_OUTPUT=$OUTPUT_DIR/clash_meta
-SDK_PACKAGE=$SDK_ROOT/package/luci-app-openclash
-SDK_CORE=$SDK_PACKAGE/root/usr/libexec/openclash/clash_meta
-
-mkdir -p "$OUTPUT_DIR" "$SDK_PACKAGE" "$(dirname "$SDK_CORE")"
+mkdir -p "$OUTPUT_DIR"
 
 BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 docker run --rm --platform linux/arm64 \
@@ -93,29 +91,31 @@ chmod 0755 "$CORE_OUTPUT"
 file "$CORE_OUTPUT" | grep -q 'ARM aarch64'
 strings "$CORE_OUTPUT" | grep -q "$MIHOMO_BUILD_ID"
 
-rsync -a --delete --exclude tools/codemirror/node_modules/ "$PACKAGE_SOURCE/" "$SDK_PACKAGE/"
-mkdir -p "$(dirname "$SDK_CORE")"
-install -m 0755 "$CORE_OUTPUT" "$SDK_CORE"
-install -m 0755 \
-	"$SDK_PACKAGE/tools/po2lmo/src/po2lmo" \
-	"$SDK_ROOT/staging_dir/host/bin/po2lmo"
-
 docker run --rm --platform linux/amd64 \
-	-v "$SDK_ROOT:/sdk" \
+	-v "$SDK_VOLUME:/sdk" \
+	-v "$PACKAGE_SOURCE:/source:ro" \
+	-v "$OUTPUT_DIR:/output:ro" \
 	-w /sdk "$BUILDER_IMAGE" \
-	bash -lc 'PATH=/sdk/staging_dir/host/bin:$PATH make -C package/luci-app-openclash clean compile TOPDIR=/sdk V=sc -j1'
+	bash -ec '
+		rsync -a --delete --exclude tools/codemirror/node_modules/ /source/ /sdk/package/luci-app-openclash/
+		install -D -m 0755 /output/clash_meta /sdk/package/luci-app-openclash/root/usr/libexec/openclash/clash_meta
+		install -m 0755 /sdk/package/luci-app-openclash/tools/po2lmo/src/po2lmo /sdk/staging_dir/host/bin/po2lmo
+		PATH=/sdk/staging_dir/host/bin:$PATH make -C package/luci-app-openclash clean compile TOPDIR=/sdk V=sc -j1 CONFIG_PACKAGE_luci-app-openclash=y
+	'
 
-SDK_APK=$SDK_ROOT/bin/packages/aarch64_generic/base/luci-app-openclash-${PACKAGE_VERSION}-r${PACKAGE_RELEASE}.apk
 OUTPUT_APK=$OUTPUT_DIR/luci-app-openclash-${BUILD_ID}-aarch64_generic.apk
-[ -f "$SDK_APK" ] || {
-	echo "APK was not produced: $SDK_APK" >&2
-	exit 1
-}
-install -m 0644 "$SDK_APK" "$OUTPUT_APK"
+docker run --rm --platform linux/amd64 \
+	-v "$SDK_VOLUME:/sdk:ro" \
+	-v "$OUTPUT_DIR:/output" \
+	-e "PACKAGE_VERSION=$PACKAGE_VERSION" -e "PACKAGE_RELEASE=$PACKAGE_RELEASE" \
+	-e "OUTPUT_APK=$(basename "$OUTPUT_APK")" \
+	"$BUILDER_IMAGE" sh -ec '
+		install -m 0644 "/sdk/bin/targets/rockchip/armv8/packages/luci-app-openclash-${PACKAGE_VERSION}-r${PACKAGE_RELEASE}.apk" "/output/$OUTPUT_APK"
+	'
 
 docker run --rm --platform linux/amd64 \
 	-v "$OUTPUT_DIR:/output:ro" \
-	-v "$SDK_ROOT:/sdk:ro" \
+	-v "$SDK_VOLUME:/sdk:ro" \
 	-w /tmp "$BUILDER_IMAGE" bash -lc "
 		set -eu
 		APK=/output/$(basename "$OUTPUT_APK")
@@ -137,6 +137,7 @@ docker run --rm --platform linux/amd64 \
 		grep -q 'BUILD_ID=${BUILD_ID}' /tmp/package/usr/share/openclash/build-info
 		test -x /tmp/package/usr/share/openclash/openclash_package_upgrade.sh
 		test -x /tmp/package/usr/share/openclash/openclash_upgrade_log.sh
+		grep -q 'Online OpenClash updates are disabled' /tmp/package/usr/share/openclash/openclash_update.sh
 		test ! -e /tmp/package/usr/share/openclash/openclash_core.sh
 		grep -q 'core-backup.exclude' /tmp/package/usr/share/openclash/openclash_package_upgrade.sh
 		grep -q 'phase=backup result=ok' /tmp/package/usr/share/openclash/openclash_package_upgrade.sh
