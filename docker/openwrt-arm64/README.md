@@ -7,7 +7,7 @@ sysupgrade 镜像，容器原生运行在 ARM64 Docker 上。
 与实机一致的部分：
 
 - OpenWrt 25.12.5，目标 `rockchip/armv8`，APK 用户空间为 ARM64；
-- OpenClash 0.47.156；
+- OpenClash 0.47.165；
 - Ruby 3.4 和 Efan 所需标准库；
 - 当前 `~/Projects/OpenClash` 工作树的 LuCI、Ruby、Shell 代码；
 - 当前 `~/Projects/mihomo` 构建的 ARM64 x365 内核；

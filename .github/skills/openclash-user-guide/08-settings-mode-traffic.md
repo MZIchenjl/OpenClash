@@ -2,7 +2,7 @@
 
 > **用途**: 插件设置页的模式与流量控制标签页各选项（UCI 与实现，§8.1–8.3）。
 
-> **小节索引**: §8.1 实现总览（§8.1.1 强制覆盖/禁用）· §8.2 模式设置（en_mode / stack_type / proxy_mode / …）· §8.3 流量控制（router_self_proxy / disable_udp_quic / china_ip_route / …）
+> **小节索引**: §8.1 实现总览（§8.1.1 强制覆盖/禁用）· §8.2 模式设置（en_mode / stack_type / proxy_mode / …，§8.2.12 四栈性能与选型、§8.2.13 转发模式、§8.2.14 默认值与 MIPS 来源）· §8.3 流量控制（router_self_proxy / disable_udp_quic / china_ip_route / …）
 
 > UCI Section: `openclash` (anonymous section)
 > 所有选项通过 `uci set openclash.@openclash[0].<option>=<value>` 设置
@@ -100,14 +100,16 @@
 - **TUN 模式**: 创建虚拟网卡，以网络层接管所有流量。对应 Mihomo `tun.enable=true`。需要 `kmod-tun` 内核模块
 - **混合模式**: TCP 使用 system 栈 (redirect)，UDP 使用 gvisor 栈 (TUN)。对应 Mihomo `tun.stack=mixed`。适合非直连游戏等对 NAT 类型有要求的场景
 
-#### 8.2.2 stack_type — TUN 堆栈类型 (Stack Type)
+#### 8.2.2 stack_type — TUN 堆栈类型 (Select Stack Type)
 - **UCI 选项**: `openclash.@openclash[0].stack_type`
-- **可选值**: `system` / `gvisor` / `mixed`
+- **可选值**: `system` / `gvisor` / `mixed` / `mips`
 - **Mihomo 对应配置**: `tun.stack`
-- **system**: 使用 Linux 系统协议栈，性能和稳定性最好
-- **gvisor**: 用户空间网络协议栈，隔离性更好，避免内核态/用户态切换
-- **mixed**: TCP 用 system、UDP 用 gvisor
+- **system** (默认): 使用 Linux 系统协议栈，CPU 开销最低——TUN 转发首选（转发吞吐与 `mips`/`mixed` 同档，每 256MB 的 core CPU 最低）
+- **gvisor**: 用户空间网络协议栈，隔离性更好；实测单流 TCP 只有 `system` 的 1/4、每 256MB 的 CPU 高 3–6 倍、UDP 200B 丢包约 57%
+- **mixed**: TCP 用 system、UDP 用 gvisor——TCP 与 `system` 同档，UDP 实测丢包 5.1%（远好于 `gvisor` 单栈）
+- **mips**: 轻量用户空间协议栈（基于 mipstack，纯 Go、无 cgo），转发吞吐与 `system` 同档、CPU 略高
 - **依赖**: 仅在 TUN/混合模式下显示
+- **四栈性能数据与选型**: 见 §8.2.12；转发模式见 §8.2.13；默认值与 MIPS 来源见 §8.2.14
 
 #### 8.2.3 proxy_mode — 代理模式 (Proxy Mode)
 - **UCI 选项**: `openclash.@openclash[0].proxy_mode`
@@ -174,10 +176,11 @@
   - `fake-ip`: 所有 DNS 查询返回 198.18.x.x 假 IP，规则基于域名匹配，性能最优
   - `redir-host`: DNS 在客户端完成，规则基于真实 IP 匹配，适合 BT/PT
 - **tun.enable**: `en_mode_tun != 0` 时设为 `true` → Mihomo 创建 `utun` 虚拟网卡接管流量
-- **tun.stack**: `system`(系统协议栈)/`gvisor`(用户态协议栈)/`mixed`(TCP system + UDP gvisor)
+- **tun.stack**: `system`(系统协议栈)/`gvisor`(用户态协议栈)/`mixed`(TCP system + UDP gvisor)/`mips`(轻量用户态协议栈)
   - `system`: 性能最好，走 Linux 内核 TUN 驱动
   - `gvisor`: 隔离性好，UDP NAT 支持更完善
   - `mixed`: TCP 用 system 栈 (REDIRECT)，UDP 用 gvisor 栈 (TUN)
+  - `mips`: 基于 mipstack 的轻量用户态栈，CPU 占用约 gvisor 的 1/5、吞吐约为其 9 倍（实测 aarch64），但内核需支持该栈
 
 **防火墙层面的影响** (`set_firewall()`):
 - **Redir-Host (非 TUN)**: TCP 通过 REDIRECT 到 `proxy_port`(7892)，UDP 通过 TPROXY 到 `tproxy_port`(7895)，标记 fwmark 0x162
@@ -185,7 +188,91 @@
 - **TUN 模式**: 所有流量标记 0x162，路由到 `utun` 设备（策略路由），TUN 内部处理分流
 - **混合模式 (Mix)**: TUN 设备处理 UDP（走 gvisor），TCP 走 REDIRECT（system 栈）
 
----
+#### 8.2.12 TUN 堆栈性能与选型（实测）
+
+**各栈定义**
+- `system`：走系统协议栈（内核），CPU 占用最低
+- `gvisor`：用户态 gVisor 栈，隔离性最好，性能最差
+- `mixed`：TCP 走 `system`、UDP 走 `gVisor`（源码：`Mixed` 内嵌 `*System`，仅给 UDP 注册 gVisor handler）；实测其 UDP 丢包远好于 `gvisor` 单栈
+- `mips`：mihomo 自研纯 Go 用户态栈（mipstack），吞吐与 `system` 同档
+
+**转发流量经 TUN：批量 TCP**
+
+| 栈 | TCP 单流 256MB | core CPU / 256MB | TCP 4 流 | core CPU / 256MB（4 流） |
+|----|--------------|-----------------|---------|----------------------|
+| `system` | 26–43 MB/s | **6.3–7.1 s** | 39–41 MB/s | **6.3–6.4 s** |
+| `mixed` | 16–34 MB/s | 6.8–9.0 s | 31–37 MB/s | 6.8–7.5 s |
+| `mips` | 30–37 MB/s | 8.0–9.9 s | 28–43 MB/s | 8.4–9.9 s |
+| `gvisor` | **8–9 MB/s** | 37.5–41.4 s | 24–36 MB/s | 17.2–20.8 s |
+
+> **看 core CPU 更可靠**（吞吐会被客户端链路限制）：`system`/`mixed`/`mips` 同档、CPU 低（`system` 最低），`gvisor` 单流吞吐只有 1/4、每 256MB 的 CPU 高 3–6 倍。
+
+**转发流量经 TUN：短连接与 UDP 多场景**（CPU = core 的 utime+stime）
+
+| 场景 | `system` | `mixed` | `mips` | `gvisor` |
+|------|---------|--------|-------|---------|
+| 短连接：3000 次 HTTP × 32 KB（20 并发，每次新建 TCP） | 402–406 rps / CPU 10.8–11.1 s | 458 rps / 10.6 s | 453 rps / 11.8 s | 390 rps / **19.8 s** |
+| UDP 200 B 单流 20 kpps | 丢包 19.3% / 交付 1.13 MB/s / CPU 11.7 s | 丢包 **5.9%** / 1.40 MB/s / 14.5 s | 丢包 13.8% / 1.24 MB/s / 13.0 s | 丢包 **69.6%** / 0.45 MB/s / 21.7 s |
+| UDP 200 B 单流 40 kpps | 30.3% / 1.64 MB/s / 12.8 s | 48.9% / 1.24 MB/s / 14.3 s | 35.1% / 1.74 MB/s / 16.3 s | **82.4%** / 0.43 MB/s / 20.8 s |
+| UDP 1400 B 单流 7.5 kpps（约 10 MB/s） | **1.3%** / 3.79 MB/s / 11.4 s | 1.4% / 3.90 MB/s / 14.4 s | 7.9% / 3.64 MB/s / 10.5 s | **24.8%** / 2.98 MB/s / 21.4 s |
+| QUIC 形态：40 流 × 200 B × 500 pps | 3.9% / 1.32 MB/s / 12.3 s | 3.1% / 1.47 MB/s / 18.4 s | 3.5% / 1.44 MB/s / 15.4 s | **75.7%** / 0.36 MB/s / 17.4 s |
+| UDP flood：1400 B @ 100 kpps | 48.8% / 7.94 MB/s / 11.1 s | 59.8% / 7.72 MB/s / 16.2 s | 50.6% / 9.15 MB/s / 14.4 s | **85.8%** / 2.66 MB/s / 19.8 s |
+| 连接密集 + UDP 混杂（600 次短连接 + 200 B @ 10 kpps 并发） | 短连接 289 rps、UDP 丢包 2.7% / 15.1 s | 192 rps、2.5% / 18.2 s | 344 rps、3.4% / 16.0 s | 短连接 **22.7 rps**、UDP 丢包 **45.9%** / 27.5 s |
+
+> `system`/`mixed`/`mips` 在小包与短连接下差距不大（UDP 200 B 丢包互有高低），**`gvisor` 在所有小包场景都差一个量级**：UDP 200 B 丢包 70%+、40 流 QUIC 形态丢包 76%、混杂场景短连接掉到 23 rps。大包（1400 B）下 `mixed`/`system` 丢包仍在 1–2%，`gvisor` 仍有 25%。
+
+**路由器自身流量（TUN 模式）**
+
+| 栈 | 自身 TCP | 自身 UDP |
+|----|---------|---------|
+| `system` / `mixed` | ✅（实测自身 HTTPS 经代理返回 204） | ✅ |
+| `mips` / `gvisor` | ✅ | ✅ |
+
+> **四种栈都能代理路由器自身流量**，无需 REDIRECT 短路。
+
+**结论**
+1. TUN 数据面下 `system`/`mixed`/`mips` 同档（`system` CPU 最低、小包丢包波动相当），**`gvisor` 最差**：单流 TCP 只有 8–9 MB/s、每 256MB 的 CPU 高 3–6 倍、UDP 200 B 丢包 70–82%、40 流 QUIC 形态丢包 76%、连接密集场景短连接速率掉到 23 rps。
+2. **REDIRECT / TPROXY 比 TUN 便宜一个数量级**：每 256MB 的 core CPU 仅 0.36–0.60 s，而 TUN 是 6.3–41 s。短连接上同样是 TUN 更贵：REDIRECT/TPROXY 约 1170–1190 rps，TUN 四栈 390–458 rps。
+3. 选型：**优先非 TUN 的 REDIRECT/TPROXY**（见 §8.2.13）；必须用 TUN 时选 **`system`**（转发首选，CPU 最低），`mixed`/`mips` 可作备选，**避免 `gvisor`**。
+
+#### 8.2.13 转发模式（tun / redirect / tproxy）与建议
+
+**OpenClash 现状**（`init.d` 的 `set_firewall`）
+- 非 TUN 模式：**TCP 用 REDIRECT**（`redirect to $proxy_port`），**UDP 用 TPROXY**（`mark set 0x162` + `tproxy ip to 127.0.0.1:$tproxy_port`），LAN 与「路由器自身」各一套链（`openclash_mangle*` / `openclash_output`）
+- TUN 模式：流量进 `utun`，由所选栈处理
+
+**实测要点**（同一台 aarch64 六核物理机、同一条客户端链路）
+
+| 路径 | 批量 TCP | 短连接（3000 次 × 32 KB，20 并发） |
+|------|---------|-----------------------------------|
+| 直连（不经代理，基线） | 受客户端链路限制 | 823 rps |
+| LAN 客户端 → REDIRECT（TCP） | 30–33 MB/s 单流、43–72 MB/s 四流；CPU 0.40–0.47 s/256MB | **1188 rps**；CPU 4.5 s |
+| LAN 客户端 → TPROXY（TCP） | 33–35 MB/s 单流、33 MB/s 四流；CPU 0.36–0.60 s/256MB | **1169 rps**；CPU 4.6 s |
+| LAN 客户端 → TUN（四种栈） | 见 §8.2.12（8–43 MB/s）；CPU 6.3–41 s/256MB（高 15–100 倍） | 390–458 rps；CPU 10.6–19.8 s（高 2–4 倍） |
+
+**TPROXY 的 UDP 场景**（同一客户端；对比 TUN 见 §8.2.12）
+
+| 场景 | 丢包 | 交付 | core CPU |
+|------|------|------|---------|
+| UDP 200 B 单流 20 kpps | 10.7% | 1.34 MB/s | 17.5 s |
+| UDP 200 B 单流 40 kpps | 30.6% | 1.87 MB/s | 17.4 s |
+| UDP 1400 B 单流 7.5 kpps | **0.7%** | 3.93 MB/s | 12.1 s |
+| QUIC 形态 40 流 × 200 B × 500 pps | 6.5% | 1.32 MB/s | 18.0 s |
+| UDP flood 1400 B @ 100 kpps | 34.6% | **11.65 MB/s** | 18.8 s |
+| 连接密集 + UDP 混杂（600 短连接 + 200 B @ 10 kpps） | 短连接 903 rps、UDP 丢包 1.6% | — | 13.2 s |
+
+> 小包路径的丢包基本由「每秒包数」而非转发方式决定（TPROXY 与 TUN 同档），差别在实际交付带宽与 CPU：flood 场景 TPROXY 交付 11.65 MB/s，TUN 四栈只有 2.7–9.2 MB/s。
+
+**建议**
+1. **优先 REDIRECT/TPROXY**：内核短路，CPU 只有 TUN 数据面的 1/15 以下（短连接场景 1/2–1/4，速率反而更高：约 1170 rps vs 390–458 rps）；吞吐在客户端链路允许范围内相同。TUN 仅用于必须整机接管（如 Docker、无法下发透明代理规则的场景）。
+2. **保持现状（TCP=REDIRECT、UDP=TPROXY）**：两者 TCP 批量吞吐与 CPU 同级（0.40 vs 0.60 s/256MB），而 REDIRECT 不需要额外的 `ip rule`/local 路由表，且对路由器自身流量同样生效。
+3. TPROXY-TCP 的意义在于**透明代理链路更干净**，属功能取舍而非性能优化：REDIRECT 在 PREROUTING 把目标 DNAT 成本地地址，代理只能靠 `getsockopt(SO_ORIGINAL_DST)` 从 conntrack 反查客户端原本要去的目标（查不到就静默断连）；TPROXY 不改写报文，目标直接来自报文本身（`listener/tproxy/tproxy.go` 读 `conn.LocalAddr()`）。**源 IP 两种方式都会保留**
+
+#### 8.2.14 默认值与 MIPS 来源
+
+- mihomo 内核默认 = **`gvisor`**（`constant/tun.go` 的 `TUNStack` 零值为 `TunGvisor`，`listener/parse.go`、`config/config.go` 的默认 tun 也写 `Stack: C.TunGvisor`）；OpenClash 插件默认 = **`system`**。
+- 官方 wiki（TUN → stack）：「如无使用问题，建议使用 `mixed` 栈，默认 `gvisor`」，并写明 `system` 占用相对更低；对 `mips` 仅描述为「mihomo 自研的 IP 协议栈」，**未作推荐**。
+- `mips` 基于 `github.com/metacubex/mipstack`（README 自述：pure-Go、无需 cgo）；在 mihomo 中先用于 ZeroTier 与 WireGuard 出站的 `ip-stack`，TUN 集成较晚（随 sing-tun v0.4.24 引入）。
 
 ### 8.3 流量控制标签页 (traffic_control)
 
@@ -193,7 +280,7 @@
 >
 > **AI 行为指引**: 当用户询问流量路由问题时（如"TUN 和 TPROXY 有什么区别"、"如何让某设备不走代理"、
 > "旁路由/网关模式下如何配置"、"IPv6 流量如何控制"），AI 应结合本章节的防火墙规则详解
-> 和 [Mihomo 监听器文档](https://wiki.metacubex.one/config/listeners/) 回答，说明不同模式
+> 和 [Mihomo 监听器文档](https://wiki.metacubex.one/config/inbound/) 回答，说明不同模式
 > 的工作原理（而非仅给出操作步骤），帮助用户理解后做出选择。
 > 涉及防火墙实现细节时，查阅 [OpenClash 源码](https://github.com/vernesong/OpenClash/tree/dev) 中
 > `init.d/openclash` 和 `yml_change.sh` 的相关逻辑。
@@ -231,13 +318,23 @@
 
 #### 8.3.5 china_ip_route — 实验性：绕过指定区域 IP (China IP Route)
 - **UCI 选项**: `openclash.@openclash[0].china_ip_route`
+- **默认**: 0 (关闭)
 - **可选值**:
   - `0` — 关闭
   - `1` — 绕过中国大陆 IP (将国内 IP 直连，提升性能)
   - `2` — 绕过海外 IP
-- **说明**: 强烈推荐启用「绕过中国大陆」。启用后，会在 `fake-ip-filter` 添加 `rule-set:oc-cn-domain` 规则集 (旧版本为 GeoSite 数据库中分类为 `CN` 的域名)，且解析 IP 位于大陆 IP 段范围内的流量将不进入内核，显著降低内核性能开销。旁路由模式下如果遇到大陆域名无法访问可尝试开启"旁路由兼容"选项
-- **Mihomo 对应**: 通过 `dns.fake-ip-filter` 添加 `rule-set:oc-cn-domain` 规则集，使中国大陆域名返回真实 IP 而非 Fake-IP；同时自动注册对应的 `rule-providers` 条目指向 MetaCubeX geosite CN MRS 文件
-- **实现细节（双重机制）**: 1) **YAML 层面**: `yml_change.sh` 修改 `dns.fake-ip-filter`——blacklist 模式（默认）追加 `rule-set:oc-cn-domain`，whitelist 模式移除 CN 相关过滤器，rule 模式前置 `RULE-SET,oc-cn-domain,real-ip`。效果：匹配的中国大陆域名返回真实 IP，绕过 Fake-IP 机制。2) **防火墙层面**: `set_firewall()` 使用 chnroute IP 列表构建 nftables set（`china_ip_route` 或者 `china_ip6_route`），在 redirect/TPROXY 链中匹配国内真实 IP 直连 return。两层面互为补充——YAML fake-ip-filter 确保大陆域名获得真实 IP，防火墙 nft set 匹配这些真实 IP 使其跳过代理。
+- **说明**: 强烈推荐启用「绕过中国大陆」。启用后，默认在 `fake-ip-filter` 添加 `rule-set:oc-cn-domain`，也可选择使用当前 GeoSite 数据库中的 `cn` 分类；解析 IP 位于大陆 IP 段范围内的流量将不进入内核，显著降低内核性能开销。旁路由模式下如果遇到大陆域名无法访问可尝试开启"旁路由兼容"选项
+- **Mihomo 对应**: 根据 `china_ip_route_domain_source`，通过 `dns.fake-ip-filter` 添加 MRS Rule-Set 或 GeoSite CN 规则，使中国大陆域名返回真实 IP 而非 Fake-IP；选择 MRS 时同时自动注册对应的 `rule-providers` 条目
+- **实现细节（双重机制）**: 1) **YAML 层面**: `yml_change.sh` 根据域名数据源和 `fake-ip-filter-mode` 修改 `dns.fake-ip-filter`；默认 MRS 使用 `rule-set:oc-cn-domain`，GeoSite 使用 `geosite:cn`，rule 模式则使用对应的大写规则语法，whitelist 模式不追加并移除已有 CN 相关过滤器。2) **防火墙层面**: `set_firewall()` 使用 chnroute IP 列表构建 nftables set（`china_ip_route` 或者 `china_ip6_route`），在 redirect/TPROXY 链中匹配国内真实 IP 直连 return。两层面互为补充——YAML fake-ip-filter 确保大陆域名获得真实 IP，防火墙 nft set 匹配这些真实 IP 使其跳过代理。
+
+#### 8.3.5.1 china_ip_route_domain_source — 中国大陆域名数据源 (China IP Route Domain Source)
+- **UCI 选项**: `openclash.@openclash[0].china_ip_route_domain_source`
+- **可选值**: `mrs`（默认）/ `geosite`
+- **界面名称**: `mrs` 显示为「MetaCubeX 规则 cn.mrs（默认）」；`geosite` 显示为「GeoSite 规则 geosite:cn」
+- **选择保留**: 关闭区域 IP 绕行后保存设置，会保留已保存的数据源选择；重新开启时继续使用该选择。
+- **依赖**: 仅 Fake-IP 系列模式，并在 `china_ip_route` 或 `china_ip6_route` 启用时显示
+- **说明**: `mrs` 使用 `MetaCubeX/meta-rules-dat` 提供的独立 `cn.mrs` 规则集，blacklist 模式追加 `rule-set:oc-cn-domain`，rule 模式追加 `RULE-SET,oc-cn-domain,real-ip`；`geosite` 使用当前 `/etc/openclash/GeoSite.dat` 中的 `cn` 分类，分别追加 `geosite:cn` 或 `GEOSITE,cn,real-ip`。whitelist 模式下两种来源都不自动追加 CN 过滤器。选择 `geosite` 时不会自动注册 `rule-providers.oc-cn-domain`，并会跟随用户配置的 GeoSite 数据源与更新周期。
+- **资源与故障差异**: MRS 是默认值，使用独立 CN 规则集；GeoSite 从当前数据库读取 `cn` 分类。在 x86/64 实测中，使用 `geosite:cn` 比 MRS 多占用约 20 MiB 内存，具体差值因内核和规则库而异。MRS 本地文件缺失或损坏且下载失败时，Mihomo 仍可启动，但依赖该规则集的域名可能返回 Fake-IP，影响区域绕行；所需的 GeoSite 数据无法加载或缺少 `cn` 分类时，Mihomo 配置校验和启动会失败。
 
 #### 8.3.6 intranet_allowed — 仅允许内网 (Only Intranet Allowed)
 - **UCI 选项**: `openclash.@openclash[0].intranet_allowed`
@@ -265,9 +362,10 @@
 #### 8.3.10 chnroute_pass — 绕过指定区域 IPv4 黑名单 (Chnroute Bypassed List)
 - **UCI 选项**: `openclash.@openclash[0].chnroute_pass`
 - **存储文件**: `/etc/openclash/custom/openclash_custom_chnroute_pass.list`
-- **说明**: 列表中的域名/IP 不受中国 IP 绕行选项影响，依赖 Dnsmasq。**默认已预置** `services.googleapis.cn`、`googleapis.cn`、`xn--ngstr-lra8j.com` 以解决 Google Play 下载问题
+- **说明**: 列表中的域名/IP 不受中国 IP 绕行选项影响，依赖 Dnsmasq
 - **依赖**: `enable_redirect_dns != 2`
-- **注意**: chnroute_pass 仅在 DNS 解析层面将域名解析 IP 加入 `china_ip_route_pass` nft set 使其跳过绕行规则，但若上游 DNS 本身将这些域名解析到国内 IP，加入 set 后仍会被 `china_ip_route` 规则误判为国内 IP 而绕行。**仅靠 chnroute_pass 不足以解决 Google Play 下载问题**——必须同时从 DNS 解析（`nameserver-policy` 强制走境外 DNS）和规则匹配（自定义规则走代理）两方面入手，详见 `03-errors.md` §3.14 功能异常类
+- **Fake-IP 模式下的额外处理**: 「绕过指定区域」开启（`china_ip_route` 或 `china_ip6_route` 非 0）且 `en_mode=fake-ip` + `enable_redirect_dns != 2` 时，列表中的域名会被写入 `dns.fake-ip-filter`（黑名单模式写入 `+.域名`，规则模式写入 `DOMAIN-SUFFIX,域名,real-ip`，白名单模式则查找现有 `fake-ip-filter` 并删除包含这些域名的条目），不再依赖 `custom_fakeip_filter` 开关
+- **注意**: chnroute_pass 仅在 DNS 解析层面将域名解析 IP 加入 `china_ip_route_pass` nft set 使其跳过绕行规则，但若上游 DNS 本身将这些域名解析到国内 IP，加入 set 后仍会被 `china_ip_route` 规则误判为国内 IP 而绕行。**仅靠 chnroute_pass 不足以解决 Google Play 下载问题**——必须同时从 DNS 解析（`nameserver-policy` 强制走境外 DNS，见内置覆写模块 `Google_Play`）和规则匹配（自定义规则走代理）两方面入手，详见 `03-errors.md` §3.14 功能异常类
 
 #### 8.3.11 UPNP 流量排除（无 UCI 选项，自动生效）
 - **触发条件**: 系统已安装并运行 `upnpd`（`/etc/config/upnpd` 存在且 `upnp_lease_file` 指向有效租约文件）

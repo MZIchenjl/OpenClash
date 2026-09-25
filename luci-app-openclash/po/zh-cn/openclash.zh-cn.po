@@ -194,6 +194,18 @@ msgstr "实验性：绕过指定区域 IP"
 msgid "China IPv6 Route"
 msgstr "实验性：绕过指定区域 IPv6"
 
+msgid "China IP Route Domain Source"
+msgstr "中国大陆域名数据源"
+
+msgid "Select The China Domain Data Source Used by China IP Route in Fake-IP Mode. MetaCubeX Uses cn.mrs from MetaCubeX/meta-rules-dat; GeoSite Uses The cn Category in The Current GeoSite Database"
+msgstr "选择 Fake-IP 模式下区域 IP 绕行使用的中国大陆域名数据源。MetaCubeX 使用 MetaCubeX/meta-rules-dat 提供的 cn.mrs；GeoSite 使用当前 GeoSite 数据库中的 cn 分类"
+
+msgid "MetaCubeX Rules cn.mrs (Default)"
+msgstr "MetaCubeX 规则 cn.mrs（默认）"
+
+msgid "GeoSite Rules geosite:cn"
+msgstr "GeoSite 规则 geosite:cn"
+
 msgid "Bypass Mainland China"
 msgstr "绕过中国大陆"
 
@@ -319,9 +331,6 @@ msgstr "通用设置"
 
 msgid "Config Manage"
 msgstr "配置管理"
-
-msgid "Add Config File"
-msgstr "添加配置文件"
 
 msgid "Upload File Type"
 msgstr "上传文件类型"
@@ -1722,9 +1731,6 @@ msgstr "配置文件格式校验失败，尝试不使用代理下载配置文件
 msgid "Has No Proxy Field, Trying To Download Without Agent..."
 msgstr "节点部分校验失败，尝试不使用代理下载配置文件..."
 
-msgid "Config File"
-msgstr "配置文件"
-
 msgid "Subscribed Failed, Trying to Download Without Agent..."
 msgstr "订阅失败，尝试不使用代理下载配置文件..."
 
@@ -1797,14 +1803,8 @@ msgstr "下载成功，检查数据库是否已更新..."
 msgid "Has Been Updated, Starting To Replace The Old Version..."
 msgstr "有新版本，开始替换旧版本..."
 
-msgid "Update Successful!"
-msgstr "更新成功！"
-
 msgid "No Change, Do Nothing..."
 msgstr "无变化，停止操作..."
-
-msgid "Update Error, Please Try Again Later..."
-msgstr "更新失败，请稍后再试..."
 
 msgid "Start Downloading Database..."
 msgstr "开始下载数据库..."
@@ -1892,9 +1892,6 @@ msgstr "配置文件不存在，您已设置订阅信息，准备开始下载...
 
 msgid "Config Not Found"
 msgstr "缺少配置文件，请上传或更新配置文件！"
-
-msgid "Config File Format Validation Failed..."
-msgstr "配置文件格式校验失败..."
 
 msgid "Detected that the GEOIP Database is not Installed, Ready to Download..."
 msgstr "检测到 GEOIP 数据库文件不存在，准备开始下载..."
@@ -2087,6 +2084,9 @@ msgstr "修改 Fake-IP-Filter 配置失败，"
 
 msgid "Set Nameserver-Policy Failed,"
 msgstr "修改 Nameserver-Policy 配置失败，"
+
+msgid "Set Proxy-Server-Nameserver-Policy Failed,"
+msgstr "修改 Proxy-Server-Nameserver-Policy 配置失败，"
 
 msgid "Set Custom Rules Failed,"
 msgstr "设置自定义规则失败，"
@@ -2898,9 +2898,6 @@ msgstr "客户端指纹"
 msgid "Edit Client-fingerprint Failed,"
 msgstr "修改 Client-fingerprint 失败，"
 
-msgid "Edit Client-fingerprint Failed,"
-msgstr "修改 Client-fingerprint 失败，"
-
 msgid "Traffic Control"
 msgstr "流量控制"
 
@@ -3135,17 +3132,11 @@ msgstr "Proxy-server-nameserver 选项可能全部设置了代理选项，插件
 msgid "For Avoiding Proxies Server Resolve Loop..."
 msgstr "以避免代理服务器解析回环..."
 
-msgid "Config File"
-msgstr "配置文件"
-
 msgid "Downloading URL"
 msgstr "订阅的下载链接为"
 
 msgid "Downloading User-Agent"
 msgstr "订阅的 User-Agent 为"
-
-msgid "Option"
-msgstr "选项"
 
 msgid "Option"
 msgstr "选项"
@@ -3479,9 +3470,6 @@ msgstr "文件名包含无效字符"
 
 msgid "Uploading..."
 msgstr "上传中..."
-
-msgid "Generating..."
-msgstr "生成中..."
 
 msgid "Upload completed"
 msgstr "上传完成"
@@ -3915,8 +3903,20 @@ msgstr "跳过不支持的参数"
 msgid "skip General key type error"
 msgstr "跳过值类型错误的参数"
 
+msgid "skip config file outside /etc/openclash"
+msgstr "跳过 /etc/openclash 之外的配置文件"
+
+msgid "skip config file with unsafe path"
+msgstr "跳过路径不安全的配置文件"
+
+msgid "skip hidden config file"
+msgstr "跳过隐藏的配置文件"
+
 msgid "skip invalid Overwrite command"
 msgstr "跳过不支持的覆写命令"
+
+msgid "skip unsafe Overwrite command"
+msgstr "跳过不安全的覆写命令"
 
 msgid "Processing Overwrite Module"
 msgstr "执行覆写模块"
@@ -4022,9 +4022,6 @@ msgstr "请输入配置..."
 
 msgid "Edit original config..."
 msgstr "编辑原始配置..."
-
-msgid "Runtime config (read only)"
-msgstr "运行配置（只读）"
 
 msgid "Set Custom Overwrite Script Failed,"
 msgstr "自定义覆写命令执行失败，"
@@ -4682,3 +4679,72 @@ msgstr "版本号"
 
 msgid "to update individually"
 msgstr "则独立更新"
+
+msgid "A custom planet file. An orbit (a world and its seed) belongs to Other Parameters"
+msgstr "自定义 planet 文件。orbit（world 与其 seed）请写在“其他参数”里"
+
+msgid "auto: relay only when the direct path fails, force: always relay, disable: off"
+msgstr "auto：直连失败才走中继；force：始终中继；disable：关闭"
+
+msgid "only for http-mask-mode stream, poll or auto"
+msgstr "仅在 http-mask-mode 为 stream、poll 或 auto 时生效"
+
+msgid "Write Uci Config Failed,"
+msgstr "写入 UCI 配置失败，"
+
+msgid "Resolve Group Failed,"
+msgstr "策略组解析失败，"
+
+msgid "Merge Failed,"
+msgstr "配置合并失败，"
+
+msgid "Update Config File Failed,"
+msgstr "更新配置文件失败，"
+
+msgid "Rule-Provider"
+msgstr "规则集"
+
+msgid "Is Not Registered, Deleted The Fake-IP-Filter Rule"
+msgstr "未定义，已删除 Fake-IP-Filter 规则"
+
+msgid "to Avoid Core Start Failed..."
+msgstr "避免内核启动失败..."
+
+msgid "Built-in"
+msgstr "内置"
+
+msgid "Unset"
+msgstr "未配置"
+
+msgid "Collapse"
+msgstr "收起"
+
+msgid "Expand"
+msgstr "展开"
+
+msgid "Modules"
+msgstr "覆写模块"
+
+msgid "Local Mod"
+msgstr "本地模块"
+
+msgid "Sub Mod"
+msgstr "订阅模块"
+
+msgid "Local Module"
+msgstr "本地模块"
+
+msgid "New Module"
+msgstr "添加新模块"
+
+msgid "Module Name"
+msgstr "模块名称"
+
+msgid "Please enter a module name"
+msgstr "请输入模块名称"
+
+msgid "Ready to add module"
+msgstr "准备添加模块"
+
+msgid "Are you sure you want to delete this module and its subscription info?"
+msgstr "确定要删除此模块及其订阅信息吗？"

@@ -77,14 +77,18 @@ SDK_CORE=$SDK_PACKAGE/root/usr/libexec/openclash/clash_meta
 mkdir -p "$OUTPUT_DIR" "$SDK_PACKAGE" "$(dirname "$SDK_CORE")"
 
 BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-(
-	cd "$REPO_ROOT/mihomo"
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build \
-		-tags with_gvisor \
-		-trimpath \
-		-ldflags "-X 'github.com/metacubex/mihomo/constant.Version=$MIHOMO_BUILD_ID' -X 'github.com/metacubex/mihomo/constant.BuildTime=$BUILD_TIME' -w -s -buildid=" \
-		-o "$CORE_OUTPUT" .
-)
+docker run --rm --platform linux/arm64 \
+	-v "$REPO_ROOT/mihomo:/src:ro" \
+	-v "$OUTPUT_DIR:/output" \
+	-v openclash-mihomo-mod:/go/pkg/mod \
+	-v openclash-mihomo-build-cache:/root/.cache/go-build \
+	-w /src \
+	-e "MIHOMO_BUILD_ID=$MIHOMO_BUILD_ID" -e "BUILD_TIME=$BUILD_TIME" \
+	golang:1.25-bookworm \
+	sh -ec 'CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -mod=readonly \
+		-tags with_gvisor -trimpath \
+		-ldflags "-X github.com/metacubex/mihomo/constant.Version=$MIHOMO_BUILD_ID -X github.com/metacubex/mihomo/constant.BuildTime=$BUILD_TIME -w -s -buildid=" \
+		-o /output/clash_meta .'
 chmod 0755 "$CORE_OUTPUT"
 file "$CORE_OUTPUT" | grep -q 'ARM aarch64'
 strings "$CORE_OUTPUT" | grep -q "$MIHOMO_BUILD_ID"

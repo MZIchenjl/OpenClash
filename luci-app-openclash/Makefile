@@ -1,8 +1,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openclash
-PKG_VERSION:=0.47.156
-PKG_RELEASE:=4
+PKG_VERSION:=0.47.165
+PKG_RELEASE:=5
 PKG_MAINTAINER:=vernesong <https://github.com/vernesong/OpenClash>
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
@@ -50,7 +50,7 @@ define Package/$(PKG_NAME)
 endef
 
 define Package/$(PKG_NAME)/description
-    OpenClash 0.47.156 bundled with the pinned Mihomo core (x365-v4)
+    OpenClash 0.47.165 bundled with the pinned Mihomo core (x365-v5)
 endef
 
 define Build/Prepare
@@ -172,7 +172,7 @@ define Package/$(PKG_NAME)/postrm
 	rm -rf /tmp/openclash.change >/dev/null 2>&1
 	rm -rf /usr/share/openclash >/dev/null 2>&1
 	rm -rf /tmp/openclash_version_history.json >/dev/null 2>&1
-    rm -rf /tmp/openclash_cdn_info.json >/dev/null 2>&1
+	rm -rf /tmp/openclash_cdn_info.json >/dev/null 2>&1
 	rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openclash_custom_domain.conf >/dev/null 2>&1
 	rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openclash_chnroute_pass.conf >/dev/null 2>&1
 	rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openclash_chnroute6_pass.conf >/dev/null 2>&1
@@ -184,8 +184,11 @@ define Package/$(PKG_NAME)/postrm
 	rm -rf /tmp/openclash_version_history_* >/dev/null 2>&1
 	rm -rf /tmp/openclash_cdn_info_* >/dev/null 2>&1
 	sed -i '/OpenClash Append/,/OpenClash Append End/d' "/usr/lib/lua/luci/model/network.lua" >/dev/null 2>&1
-	sed -i '/.*kB maximum content size*/c\HTTP_MAX_CONTENT      = 1024*100		-- 100 kB maximum content size' /usr/lib/lua/luci/http.lua >/dev/null 2>&1
-	sed -i '/.*kB maximum content size*/c\export let HTTP_MAX_CONTENT = 1024*100;		// 100 kB maximum content size' /usr/share/ucode/luci/http.uc >/dev/null 2>&1
+	sed -i 's/\(HTTP_MAX_CONTENT[[:space:]]*=[[:space:]]*\)[0-9][0-9]*\([[:space:]]*\*[[:space:]]*[0-9][0-9]*\)*/\11024*100/' /usr/lib/lua/luci/http.lua >/dev/null 2>&1
+	sed -i 's/\(HTTP_MAX_CONTENT[[:space:]]*=[[:space:]]*\)[0-9][0-9]*\([[:space:]]*\*[[:space:]]*[0-9][0-9]*\)*/\11024*100/' /usr/share/ucode/luci/http.uc >/dev/null 2>&1
+	rm -f /etc/nginx/conf.d/openclash.conf >/dev/null 2>&1
+	rm -f /etc/nginx/conf.d/openclash.locations >/dev/null 2>&1
+	[ -x /etc/init.d/nginx ] && /etc/init.d/nginx reload >/dev/null 2>&1
 	uci -q delete firewall.openclash
 	uci -q commit firewall
 	[ -f "/etc/config/ucitrack" ] && {
