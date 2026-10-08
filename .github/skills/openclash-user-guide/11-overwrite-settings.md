@@ -43,7 +43,7 @@
 #### 11.2.3 urltest_address_mod — 测速（连通性）地址修改 (URL-Test Address Modify)
 - **UCI**: `openclash.@config_overwrite[0].urltest_address_mod`
 - **默认**: 0 (禁用)
-- **预设**: `http://www.gstatic.com/generate_204` / `http://cp.cloudflare.com/` / `https://cp.cloudflare.com/` / `http://captive.apple.com/`
+- **预设**: `http://www.gstatic.com/generate_204` / `http://cp.cloudflare.com/generate_204` / `https://cp.cloudflare.com/generate_204` / `http://captive.apple.com/generate_204`
 - **Mihomo 对应**: proxy-groups 中 url-test 类型的 `url` 字段
 - **实现细节**: `yml_rules_change.sh` 替换所有 url-test 策略组的测试 URL。Mihomo 内核周期性向此 URL 发送 HTTP HEAD/GET 请求测量延迟，作为节点选择的依据。
 
@@ -71,7 +71,7 @@
 | **SOCKS5 代理端口 (SOCKS5 Port)** | `socks_port` | 7891 | `listeners.socks` |
 | **HTTP(S)&SOCKS5 混合代理端口 (Mixed Port)** | `mixed_port` | 7893 | `listeners.mixed` (HTTP+SOCKS) |
 
-- **端口实现细节**: `yml_change.sh` 将所有端口写入 YAML 对应字段。Mihomo 内核启动时在这些端口上创建监听器，接受来自 iptables/nftables 重定向的流量或客户端直连的代理请求。修改后需重启核心。
+- **端口实现细节**: `yml_change.sh` 将所有端口写入 YAML 对应字段。Mihomo 内核启动时在这些端口上创建监听器，接受来自 iptables/nftables 重定向的流量或客户端直连的代理请求。修改后需重启插件（本页「应用设置」会自动执行 `/etc/init.d/openclash restart`）。
 
 ### 11.3 DNS 设置标签页 (DNS Settings / dns)
 
@@ -100,7 +100,7 @@
 
 #### 11.3.3 append_wan_dns — 附加上游 DNS (Append Upstream DNS)
 - **UCI**: `openclash.@config_overwrite[0].append_wan_dns`
-- **默认**: 1
+- **默认**: CBI 未设值时相当于开（`Flag`，源码里 `o.default = 1`），但**出厂 `/etc/config/openclash` 已显式写入 `0`** ⇒ 装好后的界面里是关的
 - **说明**: 将 WAN 口自动分配的运营商 DNS 和网关 IP 追加到 nameserver 列表。**主路由拨号环境推荐启用**：运营商 DNS 对直连类域名的解析延迟通常最低（1-2ms），CDN 命中更接近实际链路，省去手动配置的麻烦。若使用第三方加密 DNS（如 DoH/DoT），则需禁用此项并在 NameServer 中手动添加服务器
 - **实现细节**: `sys_dns_append()` 调用 `openclash_get_network.lua` 获取 WAN 口的 DNS 和网关地址，追加到 `/tmp/yaml_config.namedns.yaml`，后续被合并到 YAML `dns.nameserver`。支持 dhcp:// 协议直接从 DHCP 接口获取 DNS。
 
@@ -114,7 +114,7 @@
 
 #### 11.3.5 store_fakeip — 持久化 Fake-IP (Persistence Fake-IP)
 - **UCI**: `openclash.@config_overwrite[0].store_fakeip`
-- **默认**: 1
+- **默认**: CBI 未设值时相当于开（`o.default = 1`），但**出厂 `/etc/config/openclash` 已显式写入 `0`**
 - **Mihomo 对应**: `profile.store-fake-ip`
 - **说明**: 缓存 Fake-IP DNS 解析记录到文件，启动后加速响应
 - **实现细节**: 写入 YAML `profile.store-fake-ip: true`。Mihomo 将域名→Fake-IP 映射持久化到 `cache.db` 文件，重启后恢复映射，避免重启后所有域名需要重新解析。
@@ -208,14 +208,14 @@ dns:
 
 | 后缀 | 含义 | 示例 |
 |------|------|------|
-| `#RULES` | 按内核 `rules` 决定出站，无需指定策略组名（`tunnel/dns_dialer.go` 的 `DnsRespectRules`）；匹配对象为该 DNS 服务器的域名或解析出的 IP，命中策略组走代理、命中 `DIRECT` 直连，结果见内核连接日志 | `'https://dns.google/dns-query#RULES'` |
+| `#RULES` | 按内核 `rules` 决定出站，无需指定策略组名（`github.com/metacubex/mihomo/tunnel/dns_dialer.go` 的 `DnsRespectRules`）；匹配对象为该 DNS 服务器的域名或解析出的 IP，命中策略组走代理、命中 `DIRECT` 直连，结果见内核连接日志 | `'https://dns.google/dns-query#RULES'` |
 | `#<策略组名/节点名>` | 强制经该策略组/节点查询。**名字必须精确存在**，否则会被当成出站网卡名（`dialer.WithInterface`）而静默失败 | `'https://dns.google/dns-query#🚀 节点选择'` |
 | `#<网卡名>` | 从指定网卡发出 | `'8.8.8.8#eth0'` |
-| `#k=v` | 传给该协议的参数，可与上面的出站后缀用 `&` 组合。常见参数：`h3=true`（DoH 强制 HTTP/3，`dns/doh.go`）、`skip-cert-verify=true`、`name-cert-verify=`（DoH/DoT/DoQ）、`disable-reuse=true`（DoT）、`ecs=`（EDNS Client Subnet）、`disable-ipv4=true`/`disable-ipv6=true` | `'https://dns.google/dns-query#Proxy&h3=true'` |
+| `#k=v` | 传给该协议的参数，可与上面的出站后缀用 `&` 组合。常见参数：`h3=true`（DoH 强制 HTTP/3，`github.com/metacubex/mihomo/dns/doh.go`）、`skip-cert-verify=true`、`name-cert-verify=`（DoH/DoT/DoQ）、`disable-reuse=true`（DoT）、`ecs=`（EDNS Client Subnet）、`disable-ipv4=true`/`disable-ipv6=true` | `'https://dns.google/dns-query#Proxy&h3=true'` |
 
 - **`#RULES` 与全局「遵守路由规则 (`respect-rules`)」的区别**：全局开关开启时还**必须**配置 `proxy-server-nameserver`，否则内核启动即报错（`if “respect-rules” is turned on, “proxy-server-nameserver” cannot be empty`）；写成 `#RULES` 只影响这一条服务器，不触发该强校验，也不用预先配置 `proxy-server-nameserver`
-- 实现：`config/config.go` 的 `parseNameServer()` 把 `#` 后不含 `=` 的片段当作 `proxyName`；`tunnel/dns_dialer.go` 中 `proxyName == "RULES"`（常量 `DnsRespectRules`）时调用 `resolveMetadata()` 走规则引擎
-- 插件内置用例：覆写模块 `Google_Play` 的 `'https://8.8.8.8/dns-query#RULES'` 与 `'https://dns.google/dns-query#RULES'` 两条并发查询
+- 实现：`github.com/metacubex/mihomo/config/config.go` 的 `parseNameServer()` 把 `#` 后不含 `=` 的片段当作 `proxyName`；`github.com/metacubex/mihomo/tunnel/dns_dialer.go` 中 `proxyName == "RULES"`（常量 `DnsRespectRules`）时调用 `resolveMetadata()` 走规则引擎
+- 插件内置示例：覆写模块 `Google_Play` 的 `'https://8.8.8.8/dns-query#RULES'` 与 `'https://dns.google/dns-query#RULES'` 两条并发查询
 
 ### 11.4 Meta 设置标签页 (Meta Settings / meta)
 
@@ -253,7 +253,7 @@ dns:
 
 #### 11.4.4 enable_meta_sniffer — 启用流量（域名）探测 (Enable Sniffer)
 - **UCI**: `openclash.@config_overwrite[0].enable_meta_sniffer`
-- **默认**: 1
+- **默认**: 0 (关闭)
 - **Mihomo 对应**: `sniffer.enable: true`
 - **说明**: 防止域名代理和 DNS 劫持失败。通过嗅探 TLS/HTTP/QUIC 握手获取真实目标域名
 - **实现细节**: `yml_change.sh` 写入完整的 `sniffer:` YAML 段：
@@ -261,9 +261,9 @@ dns:
   - `sniff.HTTP.ports: [80, 8080-8880]` — 解析 HTTP Host 头获取域名
   - `sniff.QUIC.ports: [443]` — 解析 QUIC Initial 包中的 SNI
   - `force-dns-mapping: true` (仅 Redir-Host) — 对 DNS 解析过的 IP 强制嗅探
-  - `override-destination: true` — 用嗅探到的域名覆盖连接目标，确保规则基于域名匹配
-  - 预置 `force-domain: [netflix, nflxvideo, amazonaws, media.dssott.com]` — 强制嗅探流媒体
-  - 预置 `skip-domain: [Mijia Cloud, dlg.io.mi.com, oray.com, sunlogin.net, push.apple.com]` — 跳过智能家居/推送
+  - `override-destination: false` — 用嗅探到的域名覆盖连接目标，确保规则基于域名匹配
+  - 预置 `force-domain: ['+.netflix.com', '+.nflxvideo.net', '+.amazonaws.com', '+.media.dssott.com']` — 强制嗅探流媒体
+  - 预置 `skip-domain: ['Mijia Cloud', 'dlg.io.mi.com', '+.oray.com', '+.sunlogin.net', '+.push.apple.com']` — 跳过智能家居/推送
 
 #### 11.4.5 enable_meta_sniffer_pure_ip — 探测（嗅探）纯 IP 连接 (Forced Sniff Pure IP)
 - **UCI**: `openclash.@config_overwrite[0].enable_meta_sniffer_pure_ip`
@@ -284,7 +284,7 @@ dns:
 #### 11.4.8 geodata_loader — Geodata 数据加载方式 (Geodata Loader Mode)
 - **UCI**: `openclash.@config_overwrite[0].geodata_loader`
 - **可选值**: `0`(禁用) / `memconservative` / `standard`
-- **默认**: `memconservative`
+- **默认**: `0` (禁用；`yml_change.sh` 仅在非 0 时才写入该键)
 - **Mihomo 对应**: `geodata-loader`
 - **说明**: `memconservative` 专为小内存设备优化的加载器（逐段读取），`standard` 为标准加载器（一次性加载到内存，速度快但占内存）
 
@@ -333,10 +333,10 @@ dns:
 > 1. 首先查阅下方「智能设置标签页」中对应 UCI 选项的说明，给出 LuCI 操作路径（覆写设置 → Smart 设置）
 > 2. Smart 策略组是 **Smart 核心源码独有的功能**（上游 Mihomo 核心无此特性），所有实现细节均应查阅
 >    [Smart 核心源码](https://github.com/vernesong/mihomo/tree/Alpha)：
->    - 策略组节点选择逻辑 → `adapter/outboundgroup/smart.go`（`selectProxies()`、`Unwrap()`、`InitSmart()`）
->    - LightGBM 模型加载/推理/数据收集 → `component/smart/lightgbm/`（`lightgbm.go`、`collector.go`、`transform.go`）
->    - Smart 持久化存储与权重计算 → `component/smart/cachefile.go`、`component/smart/weight.go`
-> 3. **Smart 节点选择逻辑简述**（`adapter/outboundgroup/smart.go` → `selectProxies()`）：
+>    - 策略组节点选择逻辑 → `github.com/vernesong/mihomo/adapter/outboundgroup/smart.go`（`selectProxies()`、`Unwrap()`、`InitSmart()`）
+>    - LightGBM 模型加载/推理/数据收集 → `github.com/vernesong/mihomo/component/smart/lightgbm/`（`lightgbm.go`、`collector.go`、`transform.go`）
+>    - Smart 持久化存储与权重计算 → `github.com/vernesong/mihomo/component/smart/cachefile.go`、`github.com/vernesong/mihomo/component/smart/weight.go`
+> 3. **Smart 节点选择逻辑简述**（`github.com/vernesong/mihomo/adapter/outboundgroup/smart.go` → `selectProxies()`）：
 >    ① 获取目标 IP/域名的 ASN 信息 → ② 优先检查用户手动选择的节点 → ③ 查持久化缓存
 >    （boltDB 存储的历史最优结果）→ ④ 查预取缓存（周期性后台预计算）→ ⑤ 实时调用
 >    `store.GetBestProxyForTarget()` 综合历史延迟、抖动、丢包率及 LightGBM 模型预测权重
@@ -346,7 +346,7 @@ dns:
 > 4. **关于"如何训练 Smart 模型"**：用户如需自行训练模型（而非使用预训练模型），AI 应主动读取
 >    [Smart 核心源码](https://github.com/vernesong/mihomo/tree/Alpha) 中 `component/smart/lightgbm/` 目录，
 >    了解并告知用户以下信息：
->    - **数据来源**：`component/smart/lightgbm/collector.go` — 开启 `smart_collect` 后核心会在 `/etc/openclash/` 下生成 CSV 训练数据文件（含延迟、抖动、丢包率等特征；特征工程见 `transform.go`）
+>    - **数据来源**：`github.com/vernesong/mihomo/component/smart/lightgbm/collector.go` — 开启 `smart_collect` 后核心会在 `/etc/openclash/` 下生成 CSV 训练数据文件（含延迟、抖动、丢包率等特征；特征工程见 `github.com/vernesong/mihomo/component/smart/lightgbm/transform.go`）
 >    - **LightGBM 版本**：查阅 `go.mod` 中 `vernesong/leaves` 依赖确认支持的 LightGBM 版本
 >    - **环境搭建**：在 PC/服务器上安装对应版本的 LightGBM Python 包，准备训练环境
 >    - **训练脚本**：参考 `component/smart/lightgbm/` 中的特征处理与模型结构，为用户创建可运行的示例训练脚本（读取 CSV → 特征变换 → 训练 LightGBM → 导出 Model.bin）
@@ -432,7 +432,7 @@ dns:
 
 > **LuCI 路径**: 服务 → OpenClash → 配置管理 → 节点管理 → 编辑按钮 (groups-config)
 > **注意**: groups-config 不是主菜单页面，而是通过「配置管理 → 节点 & 策略组管理」页面中的编辑按钮加载进入的隐藏子页面（controller 中注册为 `nil` 显示名）。
-> **UCI Section**: `openclash.groups_config` (多条，每条对应一个策略组)
+> **UCI Section**: `openclash.proxy_groups` (多条，每条对应一个策略组；对应 CBI 文件是 `proxy-groups-config.lua`)
 > 以下为 `type=smart` 策略组独有的配置选项，用于**覆盖**全局 Smart 设置中的对应值。
 
 | 选项 | UCI Key | 默认值 | Mihomo YAML 映射 | 说明 |
@@ -440,9 +440,9 @@ dns:
 | **启用 LightGBM** (Uselightgbm) | `uselightgbm` | `false` | `proxy-groups[].uselightgbm: true/false` | 是否为此策略组启用 LightGBM 模型预测权重。优先级高于全局 `smart_enable_lgbm` |
 | **收集训练数据** (Collectdata) | `collectdata` | `false` | `proxy-groups[].collectdata: true/false` | 是否为此策略组收集训练数据。优先级高于全局 `smart_collect` |
 | **策略优先级** (Policy Priority) | `policy_priority` | *(空)* | `proxy-groups[].policy-priority: "<pattern>"` | 此策略组内节点的权重优先级，格式同全局 `smart_policy_priority`（如 `Premium:0.9;SG:1.3`）。支持正则匹配节点名称 |
-| **延迟容差** (Tolerance) | `tolerance` | *(空)* | `proxy-groups[].tolerance: <ms>` | 此策略组的延迟容差（ms），覆盖全局 `smart_tolerance`。注意：该字段在 groups-config.lua 中存在但不直接写入 YAML——`yml_rules_change.sh` 的 smart 段**不读取** per-group tolerance，仅使用全局 `smart_tolerance` 统一设置所有 smart 策略组 |
+| **延迟容差** (Tolerance) | `tolerance` | `150` | `proxy-groups[].tolerance: <ms>` | 仅 `type=url-test` 的组会显示（`proxy-groups-config.lua` 里 `o:depends("type", "url-test")`），由 `yml_rules_change.sh` 写入 url-test 组的 `tolerance`。smart 组不用这个字段（smart 组用全局 `smart_tolerance`） |
 
-> **注意**: Per-group 的 `tolerance` 字段在 LuCI 界面中可配置，但实际 YAML 生成脚本（`yml_rules_change.sh`）在 smart auto switch 处理中统一使用全局 `smart_tolerance` 值应用到**所有** smart 类型策略组。如需对不同策略组设置不同 tolerance，需通过覆写模块的 `[YAML]` 段手动指定。
+> **注意**: Per-group 的 `tolerance` 只对 `type=url-test` 组生效；`type=smart` 的组由 `yml_rules_change.sh` 统一使用全局 `smart_tolerance`（见 §11.5.5）。如需对单个 smart 组单独设置，需通过覆写模块的 `[YAML]` 段手动指定。
 >
 > **Per-group Smart 设置的生效方式**: 这些字段直接写入策略组的 YAML 配置中（如 `proxy-groups[0].uselightgbm: true`），由 Mihomo Smart 核心在运行时读取。它们与全局 Smart 设置（覆写设置 → Smart 设置）的关系是：**per-group 设置覆盖全局设置，但仅影响该策略组**。
 >

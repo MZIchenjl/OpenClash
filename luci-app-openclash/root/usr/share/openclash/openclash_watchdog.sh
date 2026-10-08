@@ -218,6 +218,9 @@ do
    stream_auto_select_openai=$(uci_get_config "stream_auto_select_openai" || echo 0)
    stream_auto_select_claude=$(uci_get_config "stream_auto_select_claude" || echo 0)
    stream_auto_select_gemini=$(uci_get_config "stream_auto_select_gemini" || echo 0)
+   stream_auto_select_bahamut=$(uci_get_config "stream_auto_select_bahamut" || echo 0)
+   stream_auto_select_spotify=$(uci_get_config "stream_auto_select_spotify" || echo 0)
+   stream_auto_select_steam=$(uci_get_config "stream_auto_select_steam" || echo 0)
    upnp_lease_file=$(uci -q get upnpd.config.upnp_lease_file)
 
 #wait for core start complete
@@ -227,11 +230,21 @@ do
 done >/dev/null 2>&1
 
 #check the clash service status
-if ! ubus call service list '{"name":"openclash"}' 2>/dev/null | jsonfilter -e '@.openclash.instances.*.running' | grep -q 'true'; then
-   uci -q set openclash.config.enable=0
-   uci -q commit openclash
-   /etc/init.d/openclash stop >/dev/null 2>&1
-   exit 0
+CORE_JSON=$(ubus call service list '{"name":"openclash"}' 2>/dev/null)
+if [ -n "$CORE_JSON" ]; then
+   # stop signals the watchdog itself, this exits it when the core vanished otherwise
+   if [ -z "$(echo "$CORE_JSON" | jsonfilter -e '@.openclash.instances.openclash')" ]; then
+      LOG_WATCHDOG "OpenClash Service Not Running, Exit..."
+      exit 0
+   fi
+   # procd drops the respawn table once it gave up on the core (crash loop)
+   if [ "$(echo "$CORE_JSON" | jsonfilter -e '@.openclash.instances.openclash.running')" != "true" ] \
+      && [ -z "$(echo "$CORE_JSON" | jsonfilter -e '@.openclash.instances.openclash.respawn.retry')" ]; then
+      uci -q set openclash.config.enable=0
+      uci -q commit openclash
+      /etc/init.d/openclash stop >/dev/null 2>&1
+      exit 0
+   fi
 fi
 
 ## Porxy history
@@ -404,7 +417,7 @@ fi
          uci -q delete dhcp.@dnsmasq[0].resolvfile
          uci -q set dhcp.@dnsmasq[0].noresolv=1
          [ "$disable_masq_cache" -eq 1 ] && {
-         	uci -q set dhcp.@dnsmasq[0].cachesize=0
+            uci -q set dhcp.@dnsmasq[0].cachesize=0
          }
          uci -q commit dhcp
          /etc/init.d/dnsmasq restart >/dev/null 2>&1
@@ -481,6 +494,18 @@ fi
             if [ "$stream_auto_select_gemini" -eq 1 ]; then
                LOG_INFO "【Gemini】Start Auto Select Unlock Proxy..."
                /usr/share/openclash/openclash_streaming_unlock.lua "Gemini" >> $LOG_FILE
+            fi
+            if [ "$stream_auto_select_bahamut" -eq 1 ]; then
+               LOG_INFO "【Bahamut Anime】Start Auto Select Unlock Proxy..."
+               /usr/share/openclash/openclash_streaming_unlock.lua "Bahamut Anime" >> $LOG_FILE
+            fi
+            if [ "$stream_auto_select_spotify" -eq 1 ]; then
+               LOG_INFO "【Spotify】Start Auto Select Unlock Proxy..."
+               /usr/share/openclash/openclash_streaming_unlock.lua "Spotify" >> $LOG_FILE
+            fi
+            if [ "$stream_auto_select_steam" -eq 1 ]; then
+               LOG_INFO "【Steam】Start Auto Select Unlock Proxy..."
+               /usr/share/openclash/openclash_streaming_unlock.lua "Steam" >> $LOG_FILE
             fi
          fi
       fi

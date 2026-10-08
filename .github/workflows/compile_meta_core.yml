@@ -2,7 +2,7 @@ name: Compile The New Clash Core
 
 on:
   workflow_dispatch:
-  
+
 jobs:
   Get-Commit-id:
     runs-on: ubuntu-latest
@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: core
-      
+
       - name: Get Current Version
         id: current_id
         run: |
@@ -41,7 +41,7 @@ jobs:
           ref: ${{ github.ref_name }}
           path: OpenClashSource
           submodules: recursive
-      
+
       - name: Get Upstream Version
         id: upstream_id
         run: |
@@ -290,7 +290,7 @@ jobs:
           if [ "${{ needs.Get-Commit-id.outputs.current_smart_id }}" != "${{ needs.Get-Commit-id.outputs.upstream_smart_id }}" ] && [ "$changes_made_to_dev_smart" = true ]; then
             final_smart_id="${{ needs.Get-Commit-id.outputs.upstream_smart_id }}"
           fi
-          
+
           echo "Updating ./dev/core_version with:"
           echo "Meta: $final_meta_id"
           echo "Smart: $final_smart_id"
@@ -325,7 +325,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          
+
           echo "Commit description from output: $COMMIT_DESCRIPTION"
           echo "Overall changes exist from output: $OVERALL_CHANGES_EXIST"
 
@@ -336,7 +336,7 @@ jobs:
             elif [ "$OVERALL_CHANGES_EXIST" = "true" ]; then
               final_commit_message="$final_commit_message: Update core versions"
             fi
-            
+
             echo "Committing with message: $final_commit_message"
             git commit -m "$final_commit_message"
             git push

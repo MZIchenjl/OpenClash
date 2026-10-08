@@ -1,8 +1,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openclash
-PKG_VERSION:=0.47.165
-PKG_RELEASE:=5
+PKG_VERSION:=0.47.171
+PKG_RELEASE:=1
 PKG_MAINTAINER:=vernesong <https://github.com/vernesong/OpenClash>
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
@@ -50,7 +50,7 @@ define Package/$(PKG_NAME)
 endef
 
 define Package/$(PKG_NAME)/description
-    OpenClash 0.47.165 bundled with the pinned Mihomo core (x365-v5)
+    OpenClash 0.47.171 bundled with the pinned Mihomo core (x365-v1)
 endef
 
 define Build/Prepare
@@ -58,6 +58,8 @@ define Build/Prepare
 	$(TARGET_CROSS)readelf -h $(CURDIR)/root/usr/libexec/openclash/clash_meta | grep -q 'Machine:.*AArch64'
 	$(CP) $(CURDIR)/root $(PKG_BUILD_DIR)
 	$(CP) $(CURDIR)/luasrc $(PKG_BUILD_DIR)
+	# Replace the @OPENCLASH_VERSION@ token with the package version (browser asset cache keys).
+	sed -i 's|@OPENCLASH_VERSION@|$(PKG_VERSION)|g' $(PKG_BUILD_DIR)/luasrc/openclash.lua $(PKG_BUILD_DIR)/luasrc/view/openclash/*.htm
 	$(foreach po,$(wildcard ${CURDIR}/po/zh-cn/*.po), \
 		po2lmo $(po) $(PKG_BUILD_DIR)/$(patsubst %.po,%.lmo,$(notdir $(po)));)
 	chmod 0755 $(PKG_BUILD_DIR)/root/etc/init.d/openclash
@@ -173,6 +175,7 @@ define Package/$(PKG_NAME)/postrm
 	rm -rf /usr/share/openclash >/dev/null 2>&1
 	rm -rf /tmp/openclash_version_history.json >/dev/null 2>&1
 	rm -rf /tmp/openclash_cdn_info.json >/dev/null 2>&1
+	rm -rf /tmp/openclash_tpl_cache >/dev/null 2>&1
 	rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openclash_custom_domain.conf >/dev/null 2>&1
 	rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openclash_chnroute_pass.conf >/dev/null 2>&1
 	rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openclash_chnroute6_pass.conf >/dev/null 2>&1

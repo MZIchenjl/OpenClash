@@ -4,6 +4,7 @@ set -eu
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 SETTINGS="$ROOT_DIR/luci-app-openclash/luasrc/model/cbi/openclash/settings.lua"
 STATUS="$ROOT_DIR/luci-app-openclash/luasrc/view/openclash/status.htm"
+STATUS_JS="$ROOT_DIR/luci-app-openclash/root/www/luci-static/resources/openclash/js/status.js"
 CONTROLLER="$ROOT_DIR/luci-app-openclash/luasrc/controller/openclash.lua"
 INIT="$ROOT_DIR/luci-app-openclash/root/etc/init.d/openclash"
 UCI_DEFAULTS="$ROOT_DIR/luci-app-openclash/root/etc/uci-defaults/luci-openclash"
@@ -22,7 +23,7 @@ if grep -q 'tab("version_update"' "$SETTINGS"; then
   exit 1
 fi
 
-if grep -q 'last_version' "$STATUS"; then
+if grep -qE 'last_version|check_core|one_key_update' "$STATUS" "$STATUS_JS"; then
   echo "status page still checks the latest online version" >&2
   exit 1
 fi
@@ -47,8 +48,16 @@ grep -q '/etc/openclash-upgrade-backup' "$MAKEFILE"
 grep -q 'backup-complete' "$MAKEFILE"
 grep -q 'PKG_UPGRADE:-0' "$MAKEFILE"
 grep -q 'root/usr/libexec/openclash/clash_meta' "$MAKEFILE"
-grep -q 'OPENCLASH_BUILD_ID=0.47.156-x365-v4' "$BUILD_INFO"
-grep -q 'MIHOMO_BUILD_ID=alpha-g80140d20-x365-v4' "$BUILD_INFO"
+. "$BUILD_INFO"
+PACKAGE_VERSION=$(sed -n 's/^PKG_VERSION:=//p' "$MAKEFILE")
+PACKAGE_RELEASE=$(sed -n 's/^PKG_RELEASE:=//p' "$MAKEFILE")
+PINNED_COMMIT=$(git -C "$ROOT_DIR" ls-files --stage mihomo | awk '{print $2}')
+[ "$OPENCLASH_VERSION" = "$PACKAGE_VERSION" ]
+[ "$MIHOMO_COMMIT" = "$PINNED_COMMIT" ]
+[ "$X365_REVISION" = "v$PACKAGE_RELEASE" ]
+[ "$OPENCLASH_BUILD_ID" = "$PACKAGE_VERSION-x365-$X365_REVISION" ]
+[ "$MIHOMO_BUILD_ID" = "alpha-g$(printf '%s' "$PINNED_COMMIT" | cut -c1-8)-x365-$X365_REVISION" ]
+[ "$BUILD_ID" = "$PACKAGE_VERSION-$MIHOMO_BUILD_ID" ]
 grep -q 'local meta_core_path="/etc/openclash/core/clash_meta"' "$CONTROLLER"
 grep -q 'OPENCLASH_BUILD_ID=' "$CONTROLLER"
 grep -q 'logger -t openclash-efan' "$CONTROLLER"
@@ -68,7 +77,7 @@ if grep -q 'value="clash_meta"' "$UPLOAD_VIEW" || grep -q 'fp == "clash_meta"' "
   echo "manual core upload is still available" >&2
   exit 1
 fi
-if grep -qE 'openclash_core\.sh|core_download|remove_all_core|backup_only_core|backup_ex_core' "$CONTROLLER" "$STATUS"; then
+if grep -qE 'openclash_core\.sh|core_download|remove_all_core|backup_only_core|backup_ex_core' "$CONTROLLER" "$STATUS" "$STATUS_JS"; then
   echo "core management code is still exposed" >&2
   exit 1
 fi
